@@ -1,0 +1,8 @@
+### Criar baralho
+GET http://localhost:3000/truco/newDeck
+
+### Distribuir cartas
+GET http://localhost:3000/truco/te2yib89m654/distribuir
+
+### Embaralhar cartas
+GET http://localhost:3000/truco/te2yib89m654/embaralhar
