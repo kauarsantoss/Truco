@@ -3,6 +3,8 @@ import styled, { css } from "styled-components";
 export const Container = styled.div<{ $position?: string; $flip?: boolean }>`
   display: flex;
   position: absolute;
+  align-items: center;
+  justify-content: center;
 
   ${({ $position, $flip }) => {
     let transform = "";
@@ -10,7 +12,7 @@ export const Container = styled.div<{ $position?: string; $flip?: boolean }>`
     if ($position === "left") {
       transform = `translateY(-50%) rotate(${ $flip ? "90deg" : "0deg" })`;
       return css`
-        left: 0;
+        left: 5%;
         top: 50%;
         transform: ${transform};
       `;
@@ -19,7 +21,7 @@ export const Container = styled.div<{ $position?: string; $flip?: boolean }>`
     if ($position === "top") {
       transform = `translateX(-50%) rotate(${ $flip ? "180deg" : "0deg" })`;
       return css`
-        top: 0;
+        top: 5%;
         left: 50%;
         transform: ${transform};
       `;
@@ -28,7 +30,7 @@ export const Container = styled.div<{ $position?: string; $flip?: boolean }>`
     if ($position === "right") {
       transform = `translateY(-50%) rotate(${ $flip ? "270deg" : "0deg" })`;
       return css`
-        right: 0;
+        right: 5%;
         top: 50%;
         transform: ${transform};
       `;
@@ -37,13 +39,22 @@ export const Container = styled.div<{ $position?: string; $flip?: boolean }>`
     if ($position === "bottom") {
       transform = `translateX(-50%) rotate(${ $flip ? "90deg" : "0deg" })`;
       return css`
-        bottom: 0;
+        bottom: 5%;
         left: 50%;
         transform: ${transform};
       `;
     }
+
+    if ($position === "center") {
+      return css`
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      `;
+    }
   }}
 `;
+
 
 export const Card = styled.img`
   width: 90px;
