@@ -34,7 +34,7 @@ export const Mesa = styled.div`
 
 export const Shackles = styled.div`
   position: absolute;
-  margin-top: 40px;
+  margin-top: 20px;
   margin-right: 10px;
   top: 0;
   padding: 5px 10px 5px 10px;
@@ -54,6 +54,7 @@ export const StorageShackles = styled.div`
 export const Us = styled.div`
   padding: 10px 20px;
   display: flex;
+  gap:10px;
   flex-direction: row;
   flex-wrap: wrap;
 `;
@@ -61,6 +62,7 @@ export const Us = styled.div`
 export const They = styled.div`
   padding: 10px 20px;
   display: flex;
+  gap:10px;
   flex-direction: row;
   flex-wrap: wrap;
 `;
