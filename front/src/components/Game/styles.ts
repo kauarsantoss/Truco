@@ -121,6 +121,7 @@ export const Card = styled.img<{ $flip?: boolean, $isShackles?: boolean }>`
   transition: transform 0.2s ease-in-out;
 
   &:hover {
+    cursor: pointer;
     transform: scale(1.1);
   }
 
