@@ -85,7 +85,7 @@ const Game = () => {
             return {
               ...player,
               hand: cartasCompletas,
-              originalHand: [...cartasCompletas], // 🔹 Agora armazenamos a mão original!
+              originalHand: [...cartasCompletas],
             };
           })
         );
@@ -95,7 +95,6 @@ const Game = () => {
     }
   };
 
-  // ✅ Agora `giveCards` está acessível e será chamado corretamente no `useEffect`
   useEffect(() => {
     giveCards();
   }, [deckId]);
@@ -192,7 +191,6 @@ const Game = () => {
     );
 
     for (let i = 1; i < roundCards.length; i++) {
-      console.log("Valor da carta papai: "+roundCards[i].card)
       const currentCardValue = getCardValue(roundCards[i].card);
       const currentCardSuit = getCardSuit(roundCards[i].card);
       const winningCardValue = getCardValue(winningCards[0].card);
@@ -221,7 +219,7 @@ const Game = () => {
             naipeForca.indexOf(currentCardSuit) ===
             naipeForca.indexOf(winningCardSuit)
           ) {
-            winningCards.push(roundCards[i]); // Empate
+            winningCards.push(roundCards[i]);
           }
         }
       } else if (!hasShackle) {
@@ -231,7 +229,7 @@ const Game = () => {
         if (currentForce > winningForce) {
           winningCards = [roundCards[i]];
         } else if (currentForce === winningForce) {
-          winningCards.push(roundCards[i]); // Empate
+          winningCards.push(roundCards[i]);
         }
       }
     }
@@ -294,7 +292,6 @@ const Game = () => {
     console.log("Time 2 vitórias: ", team2Wins);
     console.log("Empates: ", draws);
   
-    // Se a primeira rodada foi empate e a segunda foi vencida, o time leva o ponto
     if (rounds >= 2 && winners[0] === 3) {
       if (winners[1] === 1) {
         setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
@@ -305,7 +302,16 @@ const Game = () => {
       return;
     }
   
-    // Se um time venceu mais rodadas que o outro e a soma de rounds é suficiente para definir um vencedor
+    if (rounds === 2 && winners[1] === 3) {
+      if (winners[0] === 1) {
+        setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
+      } else if (winners[0] === 2) {
+        setOverallScore(prev => ({ ...prev, eles: prev.eles + 1 }));
+      }
+      resetRound();
+      return;
+    }
+  
     if (team1Wins > Math.ceil(rounds / 2)) {
       setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
       resetRound();
@@ -314,7 +320,6 @@ const Game = () => {
       resetRound();
     }
   
-    // Se houver empate na última rodada, quem ganhou a primeira leva o ponto
     if (rounds === 3 && winners[2] === 3) {
       if (winners[0] === 1) {
         setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
@@ -323,7 +328,8 @@ const Game = () => {
       }
       resetRound();
     }
-  };
+};
+
   
 
   useEffect(() => {
