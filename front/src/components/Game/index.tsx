@@ -1,8 +1,24 @@
 import { useState, useEffect } from "react";
+import * as uuid from 'uuid';
 import styles from "./styles.ts";
 import images from "../Images"; // Importando as imagens
+import io from "socket.io-client";
 
+const socket = io('http://localhost:3333');
+interface Message {
+    id: string;
+    name: string;
+    text: string;
+}
+
+interface Payload {
+    name: string;
+    text: string;
+}
 const Game = () => {
+    const [name, setName] = useState('');
+    const [text, setText] = useState('');
+    const [messages, setMessages] = useState<Message[]>([]);
     const [deckId, setDeckId] = useState();
     const [shackles, setShackles] = useState([]);
     const [players, setPlayers] = useState([
@@ -11,6 +27,22 @@ const Game = () => {
     { id: 3, name: "Jogador 3", hand: [images[""], images[""], images[""]], position: "top" },
     { id: 4, name: "Jogador 4", hand: [images[""], images[""], images[""]], position: "right" },
   ]);
+
+    useEffect(() => {
+        function receivedMessage(message: Payload) {
+            const newMessage: Message = {
+                id: uuid.v4(),
+                name: message.name,
+                text: message.text,
+            };
+
+            setMessages([...messages, newMessage]);
+        }
+        socket.on('msgToClient', (message: Payload) => {
+            receivedMessage(message);
+            // console.log(message);
+        });
+    }, [messages, name, text]);
 
   useEffect(() => {
     const createDeck = async () => {
