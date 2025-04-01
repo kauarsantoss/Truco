@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import styles from "./styles.ts";
 import images from "../Images";
+import Swal from 'sweetalert2';
+
 
 const Game = () => {
-  const [deckId, setDeckId] = useState();
-  const [shackles, setShackles] = useState([]);
-  const [players, setPlayers] = useState([
+    const [deckId, setDeckId] = useState();
+    const [overallScore, setOverallScore] = useState({ nos: 11, eles: 11 });
+    const [shackles, setShackles] = useState([]);
+    const [players, setPlayers] = useState([
     {
       id: 1,
       name: "Jogador 1",
@@ -47,23 +50,14 @@ const Game = () => {
     };
 
     createDeck();
-  }, []);
-
-  useEffect(() => {
+    },[]);
     const giveCards = async () => {
       if (deckId) {
         try {
           console.log("DECKID: " + deckId);
-          const response = await fetch(
-            `https://truco-blnx.onrender.com/truco/${deckId}/distribuir`
-          );
+          const response = await fetch(`https://truco-blnx.onrender.com/truco/${deckId}/distribuir`);
           const data = await response.json();
-          const playerMap = {
-            jogador1: 1,
-            jogador2: 2,
-            jogador3: 3,
-            jogador4: 4,
-          };
+    
           setShackles(() => {
             const manilhas = data["manilha"] || [];
             const manilhasAtualizadas = [
@@ -76,23 +70,16 @@ const Game = () => {
             console.log("Manilhas Atualizadas: " + manilhasAtualizadas);
             return manilhasAtualizadas.map((card) => ({
               id: card,
-              src: images[`card${card}.png`.toLowerCase()], 
+              src: images[`card${card}.png`.toLowerCase()],
             }));
           });
-
+    
           setPlayers((prevPlayers) => {
             return prevPlayers.map((player) => {
-              const playerKey = Object.keys(playerMap).find(
-                (key) => playerMap[key] === player.id
-              );
-              const cartas = data[playerKey] || [];
-              const cartasCompletas = cartas.map(
-                (card) => images[`card${card}.png`.toLowerCase()]
-              );
-
+              const cartas = data["jogador" + player.id] || [];
               return {
                 ...player,
-                hand: cartasCompletas,
+                hand: cartas.map((card) => images[`card${card}.png`.toLowerCase()]),
               };
             });
           });
@@ -101,8 +88,30 @@ const Game = () => {
         }
       }
     };
-    giveCards();
-  }, [deckId]);
+    
+    // ✅ Agora `giveCards` está acessível e será chamado corretamente no `useEffect`
+    useEffect(() => {
+      giveCards();
+    }, [deckId]);
+    
+    const shuffle  = async () => {
+      const response = await fetch(`https://truco-blnx.onrender.com/truco/${deckId}/embaralhar`);
+      const data = await response.json();
+    }
+    const resetRound = () => {
+      setScore({ rounds: 0, winners: [0, 0, 0] });
+      setTable([]);
+      shuffle();
+      giveCards();
+    };
+
+    const resetGame = () => {
+      setScore({ rounds: 0, winners: [0, 0, 0] });
+      setOverallScore({nos: 0, eles:0})
+      setTable([]);
+      shuffle();
+      giveCards();
+    } 
 
   useEffect(() => {
     console.log("Shackles atualizados: ", shackles);
@@ -111,7 +120,7 @@ const Game = () => {
   const [table, setTable] = useState<{ card: string; position?: string }[]>([]);
   const [score, setScore] = useState<{ rounds: number; winners: number[] }>({
     rounds: 0,
-    winners: [0, 0, 0], 
+    winners: [0, 0, 0],
   });
 
   const playCard = (playerId, cardIndex) => {
@@ -140,86 +149,177 @@ const Game = () => {
     ]);
 
     if (table.length === 3) {
-      determineRoundWinner([
-        ...table,
-        {
-          card: selectedCard,
-          position: players.find((p) => p.id === playerId)?.position,
-        },
-      ]);
+      determineRoundWinner([...table, { card: selectedCard, position: players.find((p) => p.id === playerId)?.position }],shackles);
     }
   };
-
-  const determineRoundWinner = (roundCards) => {
-    const force = [
-      "card-back",
-      "4",
-      "5",
-      "6",
-      "7",
-      "Q",
-      "J",
-      "K",
-      "A",
-      "2",
-      "3",
-    ];
-
+  const determineRoundWinner = (roundCards, shackles = []) => {
+    const force = ["4", "5", "6", "7", "Q", "J", "K", "A", "2", "3"];
+    
     const getCardValue = (cardImage) => {
-      const match = cardImage.match(/card(\d+|[kqja])/);
-      return match ? match[1] : null;
+        const match = cardImage.match(/card(\d+|[kqja])/);
+        return match ? match[1].toUpperCase() : null;
     };
 
-    let winningCard = roundCards[0];
+    const getCardSuit = (cardImage) => {
+        const match = cardImage.match(/(\d+)([dshc])\.png/); 
+        return match ? match[2] : null; 
+    };
+
+    let winningCards = [roundCards[0]];
+    let hasShackle = shackles.some(shackle => shackle.id.includes(getCardValue(roundCards[0].card).toLowerCase()));
 
     for (let i = 1; i < roundCards.length; i++) {
-      const currentCardValue = String(
-        getCardValue(roundCards[i].card)
-      ).toUpperCase();
-      const winningCardValue = String(
-        getCardValue(winningCard.card)
-      ).toUpperCase();
+        const currentCardValue = getCardValue(roundCards[i].card);
+        const currentCardSuit = getCardSuit(roundCards[i].card);
+        const winningCardValue = getCardValue(winningCards[0].card);
+        const winningCardSuit = getCardSuit(winningCards[0].card);
+        
+        console.log(`Analisando carta: ${roundCards[i].card} (Valor: ${currentCardValue}, Naipe: ${currentCardSuit})`);
 
-      console.log(
-        `Analisando carta: ${roundCards[i].card} (Valor: ${currentCardValue})`
-      );
+        const isCurrentShackle = shackles.some(shackle => shackle.id.includes(currentCardValue.toLowerCase()));
 
-      if (
-        currentCardValue &&
-        winningCardValue &&
-        force.indexOf(currentCardValue) > force.indexOf(winningCardValue)
-      ) {
-        winningCard = roundCards[i];
-        console.log(`Nova carta vencedora: ${winningCard.card}`);
-      }
+        if (isCurrentShackle) {
+            if (!hasShackle) {
+                winningCards = [roundCards[i]];
+                hasShackle = true;
+            } else {
+                const naipeForca = ["o", "e", "c", "p"];
+                if (naipeForca.indexOf(currentCardSuit) > naipeForca.indexOf(winningCardSuit)) {
+                    winningCards = [roundCards[i]];
+                } else if (naipeForca.indexOf(currentCardSuit) === naipeForca.indexOf(winningCardSuit)) {
+                    winningCards.push(roundCards[i]); // Empate
+                }
+            }
+        } else if (!hasShackle) {
+            const currentForce = force.indexOf(currentCardValue);
+            const winningForce = force.indexOf(winningCardValue);
+
+            if (currentForce > winningForce) {
+                winningCards = [roundCards[i]];
+            } else if (currentForce === winningForce) {
+                winningCards.push(roundCards[i]); // Empate
+            }
+        }
     }
 
-    const winningTeam =
-      winningCard.position === "bottom" || winningCard.position === "top"
-        ? "1"
-        : "2";
+    let winningTeam = null;
 
-    console.log(`Vencedor da rodada: ${winningTeam}`);
+    if (winningCards.length > 1) {
+        console.log("Rodada empatada!");
+        winningTeam = "empate";
+    } else {
+        winningTeam = (winningCards[0].position === "bottom" || winningCards[0].position === "top") ? "1" : "2";
+        console.log(`Vencedor da rodada: ${winningTeam}`);
+    }
 
-    addPoints(winningTeam, 1);
+    addPoints(winningTeam);
     setTable([]);
-  };
+};
 
-  const addPoints = (team: "1" | "2") => {
-    setScore((prevScore) => {
+const addPoints = (team) => {
+  setScore((prevScore) => {
       const newWinners = [...prevScore.winners];
 
       if (prevScore.rounds < 3) {
-        newWinners[prevScore.rounds] = team === "1" ? 1 : 2; 
+          newWinners[prevScore.rounds] = team === "1" ? 1 : team === "2" ? 2 : 3; // 3 representa empate
+      }
+
+      if (newWinners[0] === 3 && prevScore.rounds === 1) {
+          return {
+              ...prevScore,
+              rounds: 2,
+              winners: newWinners,
+          };
       }
 
       return {
-        ...prevScore,
-        rounds: Math.min(prevScore.rounds + 1, 3), 
-        winners: newWinners, 
+          ...prevScore,
+          rounds: Math.min(prevScore.rounds + 1, 3),
+          winners: newWinners,
       };
-    });
-  };
+  });
+};
+
+  useEffect(() => {
+      determineGameWinner(score.rounds,score.winners);
+}, [score]);
+
+const determineGameWinner = (rounds, winners) => {
+  const team1Wins = winners.filter(w => w === 1).length;
+  const team2Wins = winners.filter(w => w === 2).length;
+  const draws = winners.filter(w => w === 3).length;
+  console.log("Time 1: ", team1Wins);
+  console.log("Time 2: ", team2Wins);
+
+  // Se a primeira rodada foi empate e a segunda foi vencida, o time leva o ponto
+  if (winners[0] === 3 && winners[1] === 1) {
+    setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
+    resetRound();
+  } else if (winners[0] === 3 && winners[1] === 2) {
+    setOverallScore(prev => ({ ...prev, eles: prev.eles + 1 }));
+    resetRound();
+  }
+
+  // Se um time venceu mais de uma rodada, ele vence
+  if (team1Wins > 1) {
+    setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
+    resetRound();
+  } else if (team2Wins > 1) {
+    setOverallScore(prev => ({ ...prev, eles: prev.eles + 1 }));
+    resetRound();
+  }
+
+  // Se a última rodada foi empate, quem venceu a primeira rodada leva o ponto
+  if (winners[winners.length - 1] === 3) {
+    if (winners[0] === 1) {
+      setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
+      resetRound();
+    } else if (winners[0] === 2) {
+      setOverallScore(prev => ({ ...prev, eles: prev.eles + 1 }));
+      resetRound();
+    }
+  }
+
+  // Se a segunda rodada for empate, quem venceu a primeira ganha
+  if (winners[1] === 3) {
+    if (winners[0] === 1) {
+      setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
+      resetRound();
+    } else if (winners[0] === 2) {
+      setOverallScore(prev => ({ ...prev, eles: prev.eles + 1 }));
+      resetRound();
+    }
+  }
+
+  // Se todas as rodadas forem empate, quem venceu a primeira leva o ponto
+  if (team1Wins === team2Wins && draws === 3) {
+    if (winners[0] === 1) {
+      setOverallScore(prev => ({ ...prev, nos: prev.nos + 1 }));
+      resetRound();
+    } else if (winners[0] === 2) {
+      setOverallScore(prev => ({ ...prev, eles: prev.eles + 1 }));
+      resetRound();
+    }
+  }
+};
+
+useEffect(() => {
+  if (overallScore.nos === 12) {
+    Swal.fire({
+      title: "🏆 Parabéns!",
+      text: "Nós ganhamos o jogo! 🎉",
+      icon: "success",
+      confirmButtonText: "Jogar novamente",
+    }).then(() => resetGame());
+  } else if (overallScore.eles === 12) {
+    Swal.fire({
+      title: "😢 Fim de jogo!",
+      text: "Eles ganharam! Vamos tentar de novo?",
+      icon: "error",
+      confirmButtonText: "Jogar novamente",
+    }).then(() => resetGame());
+  }
+}, [overallScore]);
 
   useEffect(() => {
     console.log("Score atual:", score.winners);
@@ -250,82 +350,82 @@ const Game = () => {
       <styles.Shackles>
         <styles.Tittle>Manilhas</styles.Tittle>
         <styles.StorageShackles>
-          {shackles.map((card, index) => (
-            <styles.Card
-              key={`${index}`}
-              src={card.src}
-              $flip={true}
-              $isShackles={true}
-            />
-          ))}
+            {shackles.map((card, index) => (
+                <styles.Card
+                key={`${index}`}
+                src={card.src}
+                $flip={true}
+                $isShackles={true}
+                />
+            ))}
         </styles.StorageShackles>
-      </styles.Shackles>
-      <styles.Container>
-        <styles.Scoreboard>
-          <styles.Us>
-            Nós:
-            {[0, 1, 2].map((roundIndex) => (
-              <styles.Ball
-                key={roundIndex}
-                $isWinner={
-                  score.winners[roundIndex] === 3
-                    ? "yellow"
-                    : score.winners[roundIndex] === 1
-                    ? "green"
-                    : score.winners[roundIndex] === 2
-                    ? "red"
-                    : "gray"
-                }
-              />
-            ))}
-          </styles.Us>
+    </styles.Shackles>
+    <styles.Container>
+      <styles.Scoreboard>
+      <styles.Us>Nós:
+        {[0, 1, 2].map((roundIndex) => (
+            <styles.Ball
+            key={roundIndex}
+            $isWinner={
+                score.winners[roundIndex] === 3
+                ? "yellow"
+                : score.winners[roundIndex] === 1
+                ? "green"
+                : score.winners[roundIndex] === 2
+                ? "red"
+                : "gray"
+            }
+            />
+        ))}
+        {overallScore.nos}
+        </styles.Us>
 
-          <styles.They>
-            Eles:
-            {[0, 1, 2].map((roundIndex) => (
-              <styles.Ball
-                key={roundIndex}
-                $isWinner={
-                  score.winners[roundIndex] === 3
-                    ? "yellow"
-                    : score.winners[roundIndex] === 2
-                    ? "green"
-                    : score.winners[roundIndex] === 1
-                    ? "red"
-                    : "gray"
-                }
-              />
-            ))}
-          </styles.They>
-        </styles.Scoreboard>
+<styles.They>Eles:
+  {[0, 1, 2].map((roundIndex) => (
+    <styles.Ball
+      key={roundIndex}
+      $isWinner={
+        score.winners[roundIndex] === 3
+          ? "yellow"
+          : score.winners[roundIndex] === 2
+          ? "green"
+          : score.winners[roundIndex] === 1
+          ? "red"
+          : "gray"
+      }
+    />
+  ))}
+  {overallScore.eles}
+</styles.They>
 
-        <styles.Mesa>
-          {table.map((item, index) => (
+</styles.Scoreboard>
+      <styles.Mesa>
+        {table.map((item, index) => (
             <styles.TableCard
               key={index}
               src={item.card}
               $flip={true}
               $position={item.position}
             />
-          ))}
-        </styles.Mesa>
-        {players.map((player) => (
-          <styles.CardContainer key={player.id} $position={player.position}>
-            {player.hand.map((card, index) => (
-              <styles.Card
-                key={`${player.id}-${index}`}
-                src={card}
-                $flip={true}
-                $isShackles={false}
-                onClick={() => playCard(player.id, index)}
+        ))}
+      </styles.Mesa>
+      {players.map((player) => (
+        <styles.CardContainer key={player.id} $position={player.position}>
+          {player.hand.map((card, index) => (
+            <styles.Card
+              key={`${player.id}-${index}`}
+              src={card}
+              $flip={true}
+              $isShackles={false}
+              onClick={() => playCard(player.id, index)}
                 onContextMenu={(event) =>
                   handleRightClick(player.id, index, event)
                 }
-              />
-            ))}
-          </styles.CardContainer>
-        ))}
-      </styles.Container>
+            />
+          ))}
+        </styles.CardContainer>
+      ))}
+    </styles.Container>
     </>
   );
 };
