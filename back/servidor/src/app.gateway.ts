@@ -161,27 +161,35 @@ export class AppGateway
             (p) => p.id === payload.playerId,
         );
         if (!player) return;
-
+    
         const selectedCard = player.hand[payload.cardIndex];
         if (!selectedCard) return;
-
+    
         // Remover a carta da mão do jogador
+        const initialTableLength = this.gameState.table.length;
         player.hand = player.hand.filter((_, index) => index !== payload.cardIndex);
-
+    
         // Adicionar a carta à mesa
         this.gameState.table.push({
             card: selectedCard,
             position: player.position,
         });
-
+    
+        // Emitir ambos os eventos: a atualização da mesa e da mão do jogador
+        this.server.emit('tableUpdated', this.gameState.table);
+        this.server.emit('playerHandUpdated', {
+            playerId: player.id,
+            hand: player.hand,
+        });
+    
         // Verificar se 3 jogadores jogaram cartas
-        if (this.gameState.table.length === 3) {
+        if (this.gameState.table.length === 4) {
             this.determineRoundWinner();
         }
-
-        // Enviar a mesa atualizada para todos os clientes
-        this.server.emit('tableUpdated', this.gameState.table);
     }
+    
+    
+
 
     // Determina o vencedor da rodada
     determineRoundWinner(): void {
