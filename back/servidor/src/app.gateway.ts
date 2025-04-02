@@ -172,6 +172,7 @@ export class AppGateway
     if (!selectedCard) return;
 
     // Remover a carta da mão do jogador
+    const initialTableLength = this.gameState.table.length;
     player.hand = player.hand.filter((_, index) => index !== payload.cardIndex);
 
     // Adicionar a carta à mesa
@@ -180,13 +181,17 @@ export class AppGateway
       position: player.position,
     });
 
+    // Emitir ambos os eventos: a atualização da mesa e da mão do jogador
+    this.server.emit('tableUpdated', this.gameState.table);
+    this.server.emit('playerHandUpdated', {
+      playerId: player.id,
+      hand: player.hand,
+    });
+
     // Verificar se 3 jogadores jogaram cartas
     if (this.gameState.table.length === 4) {
       this.determineRoundWinner();
     }
-
-    // Enviar a mesa atualizada para todos os clientes
-    this.server.emit('tableUpdated', this.gameState.table);
   }
 
   // Determina o vencedor da rodada
