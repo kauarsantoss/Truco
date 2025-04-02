@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import styles from "./styles.ts";
 import Swal from "sweetalert2";
+import images from "../Images"
 import io from "socket.io-client";
 
 const socket = io("http://localhost:3333");
@@ -122,7 +123,7 @@ const Game = () => {
             {shackles.map((card, index) => (
                 <styles.Card
                     key={index}
-                    src={"card"+card.src.toLowerCase()}  // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                    src={images["card"+card.src.toLowerCase()]}  // Faz lookup usando a chave enviada (ex.: "card3h.png")
                     $flip={true}
                     $isShackles={true}
                 />
@@ -172,7 +173,7 @@ const Game = () => {
             {table.map((item, index) => (
                 <styles.TableCard
                     key={index}
-                    src={item.card}  // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                    src={images[item.card]}  // Faz lookup usando a chave enviada (ex.: "card3h.png")
                     $flip={true}
                     $position={item.position}
                 />
@@ -183,7 +184,7 @@ const Game = () => {
                 {player.hand.map((card, index) => (
                     <styles.Card
                         key={`${player.id}-${index}`}
-                        src={"../assets/card" + card.toLowerCase()}  // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                        src={images["card"+card.toLowerCase()]}  // Faz lookup usando a chave enviada (ex.: "card3h.png")
                         $flip={true}
                         $isShackles={false}
                         onClick={() => playCard(player.id, index)}
