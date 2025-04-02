@@ -25,12 +25,17 @@ const Game = () => {
       setShackles(shacklesData);
     });
 
+    socket.on("penis", (overallScore) => {
+      setOverallScore(overallScore)
+      console.log("eu sou gay: "+overallScore)
+    })
     socket.on("tableUpdated", (updatedTable) => {
       console.log("Table atualizada: " + updatedTable);
       setTable(updatedTable);
     });
 
     socket.on("gameStateUpdate", (gameState) => {
+      console.log("Game State: ", gameState)
       setOverallScore(gameState.overallScore);
       setShackles(gameState.shackles);
       setPlayers(gameState.players);
@@ -38,19 +43,32 @@ const Game = () => {
       setScore(gameState.score);
     });
 
+    socket.on("updateScore", (gameState) => {
+      console.log("Recebendo updateScore: ", gameState);
+
+      setScore({
+        rounds: gameState?.score?.rounds ?? 0,
+        winners: Array.isArray(gameState?.score?.winners)
+            ? gameState.score.winners
+            : [0, 0, 0],
+      });
+
+      setOverallScore({
+        nos: gameState?.overallScore?.nos ?? 0,
+        eles: gameState?.overallScore?.eles ?? 0,
+      });
+    });
+
+
     // Novo manipulador para o evento "playerHandUpdated"
     socket.on("playerHandUpdated", (data) => {
       setPlayers((prevPlayers) =>
-        prevPlayers.map((player) =>
-          player.id === data.playerId
-            ? { ...player, hand: data.hand }
-            : player
-        )
+          prevPlayers.map((player) =>
+              player.id === data.playerId
+                  ? { ...player, hand: data.hand }
+                  : player
+          )
       );
-    });
-
-    socket.on("roundReset", () => {
-      setScore({ rounds: 0, winners: [0, 0, 0] });
     });
 
     return () => {
@@ -62,6 +80,11 @@ const Game = () => {
       socket.off("roundReset");
     };
   }, []);
+
+  useEffect(() => {
+    socket.emit("determineGameWinner", score);
+  }, [score]);
+
 
   // Ao montar o componente, solicitar a criação do baralho
   useEffect(() => {
@@ -113,106 +136,106 @@ const Game = () => {
   const handleRightClick = (playerId, cardIndex, event) => {
     event.preventDefault();
     setPlayers((prevPlayers) =>
-      prevPlayers.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              hand: player.hand.map((card, index) => {
-                if (index === cardIndex) {
-                  return card === "-back.png"
-                    ? player.originalHand[index]
-                    : "-back.png";
+        prevPlayers.map((player) =>
+            player.id === playerId
+                ? {
+                  ...player,
+                  hand: player.hand.map((card, index) => {
+                    if (index === cardIndex) {
+                      return card === "-back.png"
+                          ? player.originalHand[index]
+                          : "-back.png";
+                    }
+                    return card;
+                  }),
                 }
-                return card;
-              }),
-            }
-          : player
-      )
+                : player
+        )
     );
   };
 
   return (
-    <>
-      <styles.Shackles>
-        <styles.Tittle>Manilhas</styles.Tittle>
-        <styles.StorageShackles>
-          {shackles.map((card, index) => (
-            <styles.Card
-              key={index}
-              src={images["card" + card.src.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
-              $flip={true}
-              $isShackles={true}
-            />
+      <>
+        <styles.Shackles>
+          <styles.Tittle>Manilhas</styles.Tittle>
+          <styles.StorageShackles>
+            {shackles.map((card, index) => (
+                <styles.Card
+                    key={index}
+                    src={images["card" + card.src.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                    $flip={true}
+                    $isShackles={true}
+                />
+            ))}
+          </styles.StorageShackles>
+        </styles.Shackles>
+        <styles.Container>
+          <styles.Scoreboard>
+            <styles.Us>
+              Nós:
+              {score?.winners && [0, 1, 2].map((roundIndex) => (
+                  <styles.Ball
+                      key={roundIndex}
+                      $isWinner={
+                        score?.winners?.[roundIndex] === 3
+                            ? "yellow"
+                            : score?.winners?.[roundIndex] === 1
+                                ? "green"
+                                : score?.winners?.[roundIndex] === 2
+                                    ? "red"
+                                    : "gray"
+                      }
+                  />
+              ))}
+              {overallScore.nos}
+            </styles.Us>
+            <styles.They>
+              Eles:
+              {score?.winners && [0, 1, 2].map((roundIndex) => (
+                  <styles.Ball
+                      key={roundIndex}
+                      $isWinner={
+                        score?.winners?.[roundIndex] === 3
+                            ? "yellow"
+                            : score?.winners?.[roundIndex] === 2
+                                ? "green"
+                                : score?.winners?.[roundIndex] === 1
+                                    ? "red"
+                                    : "gray"
+                      }
+                  />
+              ))}
+              {overallScore.eles}
+            </styles.They>
+          </styles.Scoreboard>
+          <styles.Mesa>
+            {table.map((item, index) => (
+                <styles.TableCard
+                    key={index}
+                    src={images["card" + item.card.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                    $flip={true}
+                    $position={item.position}
+                />
+            ))}
+          </styles.Mesa>
+          {players.map((player) => (
+              <styles.CardContainer key={player.id} $position={player.position}>
+                {player.hand.map((card, index) => (
+                    <styles.Card
+                        key={`${player.id}-${index}`}
+                        src={images["card" + card.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                        $flip={true}
+                        $isShackles={false}
+                        onClick={() => playCard(player.id, index)}
+                        onContextMenu={(event) =>
+                            handleRightClick(player.id, index, event)
+                        }
+                    />
+                ))}
+              </styles.CardContainer>
           ))}
-        </styles.StorageShackles>
-      </styles.Shackles>
-      <styles.Container>
-        <styles.Scoreboard>
-          <styles.Us>
-            Nós:
-            {[0, 1, 2].map((roundIndex) => (
-              <styles.Ball
-                key={roundIndex}
-                $isWinner={
-                  score.winners[roundIndex] === 3
-                    ? "yellow"
-                    : score.winners[roundIndex] === 1
-                    ? "green"
-                    : score.winners[roundIndex] === 2
-                    ? "red"
-                    : "gray"
-                }
-              />
-            ))}
-            {overallScore.nos}
-          </styles.Us>
-          <styles.They>
-            Eles:
-            {[0, 1, 2].map((roundIndex) => (
-              <styles.Ball
-                key={roundIndex}
-                $isWinner={
-                  score.winners[roundIndex] === 3
-                    ? "yellow"
-                    : score.winners[roundIndex] === 2
-                    ? "green"
-                    : score.winners[roundIndex] === 1
-                    ? "red"
-                    : "gray"
-                }
-              />
-            ))}
-            {overallScore.eles}
-          </styles.They>
-        </styles.Scoreboard>
-        <styles.Mesa>
-          {table.map((item, index) => (
-            <styles.TableCard
-              key={index}
-              src={images["card" + item.card.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
-              $flip={true}
-              $position={item.position}
-            />
-          ))}
-        </styles.Mesa>
-        {players.map((player) => (
-          <styles.CardContainer key={player.id} $position={player.position}>
-            {player.hand.map((card, index) => (
-              <styles.Card
-                key={`${player.id}-${index}`}
-                src={images["card" + card.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
-                $flip={true}
-                $isShackles={false}
-                onClick={() => playCard(player.id, index)}
-                onContextMenu={(event) =>
-                  handleRightClick(player.id, index, event)
-                }
-              />
-            ))}
-          </styles.CardContainer>
-        ))}
-      </styles.Container>
-    </>
+        </styles.Container>
+      </>
   );
 };
 

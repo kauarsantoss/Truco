@@ -32,7 +32,7 @@ interface GameState {
   },
 })
 export class AppGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+    implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer() server: Server;
   private logger: Logger = new Logger('AppGateway');
@@ -73,7 +73,7 @@ export class AppGateway
   async createDeck(): Promise<void> {
     try {
       const response = await fetch(
-        'https://truco-blnx.onrender.com/truco/newDeck',
+          'https://truco-blnx.onrender.com/truco/newDeck',
       );
       const data = await response.json();
       this.gameState.deckId = data.deck_id;
@@ -89,7 +89,7 @@ export class AppGateway
     if (this.gameState.deckId) {
       try {
         const response = await fetch(
-          `https://truco-blnx.onrender.com/truco/${this.gameState.deckId}/embaralhar`,
+            `https://truco-blnx.onrender.com/truco/${this.gameState.deckId}/embaralhar`,
         );
         const data = await response.json();
         this.server.emit('deckShuffled', data);
@@ -105,22 +105,14 @@ export class AppGateway
     if (this.gameState.deckId) {
       try {
         const response = await fetch(
-          `https://truco-blnx.onrender.com/truco/${this.gameState.deckId}/distribuir`,
+            `https://truco-blnx.onrender.com/truco/${this.gameState.deckId}/distribuir`,
         );
         const data = await response.json();
-
-        // Log para depuração: mostrar o tipo e valor de data.manilha
-        this.logger.log('Tipo de data.manilha: ' + typeof data.manilha);
-        this.logger.log(
-          'Valor de data.manilha: ' + JSON.stringify(data.manilha),
-        );
 
         let manilhasAtualizadas: string[] = [];
         // Se data.manilha for uma string, cria as manilhas correspondentes
         const manilhaStr = data.manilha.toUpperCase();
         const manilhaSemUltimaLetra = manilhaStr.slice(0, -1);
-        this.logger.error(manilhaStr);
-        this.logger.error('Valor de data.manilha: ' + manilhaSemUltimaLetra);
         manilhasAtualizadas = [
           manilhaSemUltimaLetra + 'D', // Copas
           manilhaSemUltimaLetra + 'S', // Espadas
@@ -137,7 +129,7 @@ export class AppGateway
         this.gameState.players = this.gameState.players.map((player, index) => {
           const playerCards = data[`jogador${index + 1}`] || [];
           const playerHand = playerCards.map(
-            (card: string) => `${card.toLowerCase()}.png`,
+              (card: string) => `${card.toLowerCase()}.png`,
           );
           return {
             ...player,
@@ -147,9 +139,9 @@ export class AppGateway
         });
 
         this.server.emit(
-          'cardsDistributed',
-          this.gameState.players,
-          this.gameState.shackles,
+            'cardsDistributed',
+            this.gameState.players,
+            this.gameState.shackles,
         );
       } catch (error) {
         this.logger.error('Erro ao distribuir as cartas: ', error);
@@ -160,11 +152,11 @@ export class AppGateway
   // Lógica para jogar uma carta
   @SubscribeMessage('playCard')
   playCard(
-    client: Socket,
-    payload: { playerId: number; cardIndex: number },
+      client: Socket,
+      payload: { playerId: number; cardIndex: number },
   ): void {
     const player = this.gameState.players.find(
-      (p) => p.id === payload.playerId,
+        (p) => p.id === payload.playerId,
     );
     if (!player) return;
 
@@ -188,13 +180,21 @@ export class AppGateway
       hand: player.hand,
     });
 
-    // Verificar se 3 jogadores jogaram cartas
-    if (this.gameState.table.length === 4) {
+    // Verificar se o jogador jogou a manilha
+    if (
+        this.gameState.shackles.some((shackle) => shackle.id === selectedCard)
+    ) {
       this.determineRoundWinner();
+      return;
+    }
+
+    // Verificar se 4 jogadores jogaram cartas
+    if (this.gameState.table.length == 4) {
+      this.determineRoundWinner();
+      return;
     }
   }
 
-  // Determina o vencedor da rodada
   determineRoundWinner(): void {
     const force = [
       'card-back',
@@ -210,54 +210,56 @@ export class AppGateway
       '3',
     ];
 
-    // Função para obter o valor de uma carta
     const getCardValue = (cardImage: string): string => {
-      const match = cardImage.match(/card(\d+|[kqja])/);
-      if (cardImage.includes('card-back')) {
-        return 'card-back';
-      }
-      return match ? match[1].toUpperCase() : '';
+      const match = cardImage.match(/(\d+|[kqja])([dshc])\.png/);
+      return match ? match[1].toLowerCase() : '';
     };
 
-    // Função para obter o naipe de uma carta
     const getCardSuit = (cardImage: string): string => {
-      const match = cardImage.match(/(\d+)([dshc])\.png/);
+      const match = cardImage.match(/(\d+|[kqja])([dshc])\.png/);
       return match ? match[2] : '';
     };
 
     let winningCards = [this.gameState.table[0]];
+    const highestValue = getCardValue(this.gameState.table[0].card);
     let hasShackle = this.gameState.shackles.some((shackle) =>
-      shackle.id.includes(
-        getCardValue(this.gameState.table[0].card).toLowerCase(),
-      ),
+        shackle.id.includes(highestValue),
     );
 
     for (let i = 1; i < this.gameState.table.length; i++) {
-      const currentCardValue = getCardValue(this.gameState.table[i].card);
-      const currentCardSuit = getCardSuit(this.gameState.table[i].card);
+      const currentCard = this.gameState.table[i];
+      const currentCardValue = getCardValue(currentCard.card);
+      const currentCardSuit = getCardSuit(currentCard.card);
       const winningCardValue = getCardValue(winningCards[0].card);
       const winningCardSuit = getCardSuit(winningCards[0].card);
-
+      this.logger.error('carta que veio: ' + currentCardValue);
+      this.logger.error('carta que venceu: ' + winningCardValue);
+      this.logger.error('carta naipe penis: ' + currentCardSuit);
       const isCurrentShackle = this.gameState.shackles.some((shackle) =>
-        shackle.id.includes(currentCardValue.toLowerCase()),
+          shackle.src.includes(
+              currentCardValue.toUpperCase() + currentCardSuit.toUpperCase(),
+          ),
       );
 
+      this.logger.error('manilhas lala: ' + this.gameState.shackles[0].src);
+
       if (isCurrentShackle) {
+        this.logger.error('É uma manilha: ' + isCurrentShackle);
+
         if (!hasShackle) {
-          winningCards = [this.gameState.table[i]];
+          // Se for a primeira manilha jogada, ela lidera
+          winningCards = [currentCard];
           hasShackle = true;
         } else {
-          const naipeForca = ['o', 'e', 'c', 'p'];
-          if (
-            naipeForca.indexOf(currentCardSuit) >
-            naipeForca.indexOf(winningCardSuit)
-          ) {
-            winningCards = [this.gameState.table[i]];
-          } else if (
-            naipeForca.indexOf(currentCardSuit) ===
-            naipeForca.indexOf(winningCardSuit)
-          ) {
-            winningCards.push(this.gameState.table[i]);
+          // Ordem correta dos naipes para desempate
+          const suitPriority = ['D', 'S', 'H', 'C']; // Ouros > Espadas > Copas > Pa
+
+          const currentSuitIndex = suitPriority.indexOf(currentCardSuit.toLowerCase());
+          const winningSuitIndex = suitPriority.indexOf(winningCardSuit.toLowerCase());
+
+          if (currentSuitIndex > winningSuitIndex) {
+            // Se o naipe da nova manilha for mais forte, ela ganha
+            winningCards = [currentCard];
           }
         }
       } else if (!hasShackle) {
@@ -265,56 +267,166 @@ export class AppGateway
         const winningForce = force.indexOf(winningCardValue);
 
         if (currentForce > winningForce) {
-          winningCards = [this.gameState.table[i]];
+          winningCards = [currentCard];
         } else if (currentForce === winningForce) {
-          winningCards.push(this.gameState.table[i]);
+          winningCards.push(currentCard);
         }
       }
     }
 
-    let winningTeam;
+    const uniqueCardValues = new Set(
+        winningCards.map((c) => getCardValue(c.card)),
+    );
 
-    if (winningCards.length > 1) {
-      winningTeam = 'empate';
+    // Verifica se há empate de valores E se as cartas empatadas são de times diferentes
+    const differentTeams =
+        winningCards.some(
+            (c) => c.position === 'bottom' || c.position === 'top',
+        ) &&
+        winningCards.some((c) => c.position === 'left' || c.position === 'right');
+
+    if (
+        winningCards.length > 1 &&
+        uniqueCardValues.size === 1 &&
+        differentTeams
+    ) {
+      this.addPoints('empate');
     } else {
-      winningTeam =
-        winningCards[0].position === 'bottom' ||
-        winningCards[0].position === 'top'
-          ? '1'
-          : '2';
+      const winningTeam =
+          winningCards[0].position === 'bottom' ||
+          winningCards[0].position === 'top'
+              ? '1'
+              : '2';
+      this.addPoints(winningTeam);
     }
 
-    this.addPoints(winningTeam);
+    this.logger.debug(
+        `Vencedor da rodada: ${winningCards.length > 1 ? 'Empate' : `Time ${winningCards[0].position}`}`,
+    );
     this.gameState.table = []; // Limpar a mesa após a rodada
+    this.server.emit('tableUpdated', []);
   }
 
   // Adicionar pontos ao time vencedor
   addPoints(team: string): void {
     const winningTeam = team === '1' ? 1 : team === '2' ? 2 : 3;
 
-    this.gameState.score.winners[this.gameState.score.rounds] = winningTeam;
-
-    // Atualizando a pontuação do jogo
+    // Atualizar apenas a rodada atual sem sobrescrever rodadas futuras
     if (this.gameState.score.rounds < 3) {
+      this.gameState.score.winners[this.gameState.score.rounds] = winningTeam;
       this.gameState.score.rounds++;
     }
 
-    // Verificando se algum time atingiu a pontuação final
+    this.logger.debug(
+        `Placar Da Rodada Atualizado: ${JSON.stringify(this.gameState.score)}`,
+    );
+    this.logger.debug(
+        `Placar Geral: ${JSON.stringify(this.gameState.overallScore)}`,
+    );
+
+    this.server.emit('updateScore', {
+      overallScore: this.gameState.overallScore || { nos: 0, eles: 0 },
+      score: this.gameState.score || { rounds: 0, winners: [0, 0, 0] },
+    });
+
+    this.determineGameWinner(this.gameState.score);
+    // Verificação do fim da partida
     if (this.gameState.score.rounds === 3) {
-      if (this.gameState.score.winners.filter((w) => w === 1).length > 1) {
-        this.gameState.overallScore.nos++;
-      } else if (
-        this.gameState.score.winners.filter((w) => w === 2).length > 1
-      ) {
-        this.gameState.overallScore.eles++;
-      }
+      const nosWins = this.gameState.score.winners.filter(
+          (w) => w === 1,
+      ).length;
+      const elesWins = this.gameState.score.winners.filter(
+          (w) => w === 2,
+      ).length;
 
       this.resetRound();
+      this.logger.debug(
+          `Time vencedor do jogo: ${nosWins > 1 ? 'Nos' : elesWins > 1 ? 'Eles' : 'Empate'}`,
+      );
+      this.logger.debug(
+          `GameState Score: ${JSON.stringify(this.gameState.score)}`,
+      );
+      this.logger.debug(
+          `GameState OverallScore: ${JSON.stringify(this.gameState.overallScore)}`,
+      );
     }
+  }
+
+  determineGameWinner(score: { rounds: number; winners: number[] }): void {
+    this.logger.error('pqpq scorre.rounds:', score.rounds);
+    this.logger.error('pqpq scorre.winners:', score.winners);
+    if (score.rounds >= 2 && score.winners[0] === 3) {
+      if (score.winners[1] === 1) {
+        this.gameState.overallScore.nos++;
+      } else if (score.winners[1] === 2) {
+        this.gameState.overallScore.eles++;
+      }
+      this.server.emit('penis', {
+        overallScore: this.gameState.overallScore,
+      });
+      this.resetRound();
+    }
+
+    if (score.rounds === 2 && score.winners[1] === 3) {
+      if (score.winners[0] === 1) {
+        this.gameState.overallScore.nos++;
+      } else if (score.winners[0] === 2) {
+        this.gameState.overallScore.eles++;
+      }
+      this.server.emit('penis', {
+        overallScore: this.gameState.overallScore,
+      });
+      this.resetRound();
+    }
+
+    const nosWins = score.winners.filter((w) => w === 1).length;
+    const elesWins = score.winners.filter((w) => w === 2).length;
+
+    let winningTeam;
+
+    if (nosWins > Math.ceil(score.rounds / 2)) {
+      this.gameState.overallScore.nos++;
+      winningTeam = 'nos';
+    } else if (elesWins > Math.ceil(score.rounds / 2)) {
+      this.gameState.overallScore.eles++;
+      winningTeam = 'eles';
+    }
+
+    if (score.rounds === 3 && score.winners[2] === 3) {
+      if (score.winners[0] === 1) {
+        this.gameState.overallScore.nos++;
+      } else if (score.winners[0] === 2) {
+        this.gameState.overallScore.eles++;
+      }
+      this.server.emit('penis', {
+        overallScore: this.gameState.overallScore,
+      });
+      this.resetRound();
+    }
+
+    this.logger.error('pqpq:', this.gameState.overallScore);
+    if (winningTeam) {
+      this.logger.debug(`Jogo encerrado! Vencedor: ${winningTeam}`);
+
+      // Emitir evento de fim de jogo para o frontend
+      this.server.emit('gameEnded', {
+        winner: winningTeam,
+        overallScore: this.gameState.overallScore,
+      });
+
+      this.resetRound(); // Reinicia a rodada após o jogo ser concluído
+    }
+
+    // Atualizar placar no frontend
+    this.server.emit('updateScore', {
+      overallScore: this.gameState.overallScore,
+      score: this.gameState.score,
+    });
   }
 
   // Resetar a rodada
   resetRound(): void {
+    this.logger.debug('Resetando rodada...');
     this.gameState.score.rounds = 0;
     this.gameState.score.winners = [0, 0, 0];
     this.server.emit('roundReset');
@@ -328,6 +440,59 @@ export class AppGateway
   // Conexão com o cliente
   handleConnection(client: Socket) {
     this.logger.log(`Cliente conectado: ${client.id}`);
+
+    const connectedClients = this.server.sockets.sockets.size; // Número de clientes conectados
+
+    if (connectedClients === 1) {
+      this.logger.log(
+          'Primeiro cliente conectado. Resetando estado do jogo...',
+      );
+      this.resetGame();
+    }
+  }
+
+  resetGame(): void {
+    this.logger.log('Resetando o jogo...');
+
+    this.gameState = {
+      players: [
+        {
+          id: 1,
+          name: 'Jogador 1',
+          hand: [],
+          position: 'bottom',
+          originalHand: [],
+        },
+        {
+          id: 2,
+          name: 'Jogador 2',
+          hand: [],
+          position: 'left',
+          originalHand: [],
+        },
+        {
+          id: 3,
+          name: 'Jogador 3',
+          hand: [],
+          position: 'top',
+          originalHand: [],
+        },
+        {
+          id: 4,
+          name: 'Jogador 4',
+          hand: [],
+          position: 'right',
+          originalHand: [],
+        },
+      ],
+      table: [],
+      shackles: [],
+      overallScore: { nos: 0, eles: 0 },
+      score: { rounds: 0, winners: [0, 0, 0] },
+      deckId: null,
+    };
+
+    this.server.emit('gameReset', this.gameState);
   }
 
   // Desconexão do cliente
