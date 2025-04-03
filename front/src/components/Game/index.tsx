@@ -13,10 +13,8 @@ const Game = () => {
   const [table, setTable] = useState([]);
   const [score, setScore] = useState({ rounds: 0, winners: [0, 0, 0] });
 
-  // Configuração dos eventos do WebSocket
   useEffect(() => {
     socket.on("deckCreated", (data) => {
-      // Após a criação do baralho, solicitar a distribuição de cartas
       socket.emit("distributeCards");
     });
 
@@ -25,10 +23,12 @@ const Game = () => {
       setShackles(shacklesData);
     });
 
-    socket.on("penis", (overallScore) => {
-      setOverallScore(overallScore)
-      console.log("eu sou gay: "+overallScore)
-    })
+    socket.on("teste", (data) => {
+      console.log("eu sou gay: ", data); // Para verificar o que está vindo
+      if (data?.overallScore) {
+        setOverallScore(data.overallScore); // Atualiza apenas o objeto correto
+      }
+    });
     socket.on("tableUpdated", (updatedTable) => {
       console.log("Table atualizada: " + updatedTable);
       setTable(updatedTable);
@@ -51,11 +51,6 @@ const Game = () => {
         winners: Array.isArray(gameState?.score?.winners)
             ? gameState.score.winners
             : [0, 0, 0],
-      });
-
-      setOverallScore({
-        nos: gameState?.overallScore?.nos ?? 0,
-        eles: gameState?.overallScore?.eles ?? 0,
       });
     });
 
@@ -86,12 +81,10 @@ const Game = () => {
   }, [score]);
 
 
-  // Ao montar o componente, solicitar a criação do baralho
   useEffect(() => {
     socket.emit("newDeck");
   }, []);
 
-  // Função para jogar uma carta: emite o evento para o servidor
   const playCard = (playerId, cardIndex) => {
     const player = players.find((p) => p.id === playerId);
     if (!player || !player.hand || cardIndex >= player.hand.length) return;
@@ -109,7 +102,6 @@ const Game = () => {
     });
   };
 
-  // Verifica se algum time atingiu 12 pontos para reiniciar o jogo
   useEffect(() => {
     if (overallScore.nos === 12) {
       Swal.fire({
@@ -117,8 +109,14 @@ const Game = () => {
         text: "Nós ganhamos o jogo! 🎉",
         icon: "success",
         confirmButtonText: "Jogar novamente",
-      }).then(() => {
-        socket.emit("resetGame");
+        showCancelButton: true,
+        cancelButtonText: "Sair",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          socket.emit("restartGame"); // Se clicar em "Jogar novamente"
+        } else {
+          socket.emit("resetGame"); // Se fechar ou clicar em "Sair"
+        }
       });
     } else if (overallScore.eles === 12) {
       Swal.fire({
@@ -126,13 +124,21 @@ const Game = () => {
         text: "Eles ganharam! Vamos tentar de novo?",
         icon: "error",
         confirmButtonText: "Jogar novamente",
-      }).then(() => {
-        socket.emit("resetGame");
+        showCancelButton: true,
+        cancelButtonText: "Sair",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          socket.emit("restartGame");
+        } else {
+          socket.emit("resetGame");
+        }
       });
     }
   }, [overallScore]);
+  
 
-  // Trata o clique direito para virar a carta (efeito visual local)
+
+
   const handleRightClick = (playerId, cardIndex, event) => {
     event.preventDefault();
     setPlayers((prevPlayers) =>
@@ -162,7 +168,7 @@ const Game = () => {
             {shackles.map((card, index) => (
                 <styles.Card
                     key={index}
-                    src={images["card" + card.src.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                    src={images["card" + card.src.toLowerCase()]}
                     $flip={true}
                     $isShackles={true}
                 />
@@ -212,7 +218,7 @@ const Game = () => {
             {table.map((item, index) => (
                 <styles.TableCard
                     key={index}
-                    src={images["card" + item.card.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                    src={images["card" + item.card.toLowerCase()]}
                     $flip={true}
                     $position={item.position}
                 />
@@ -223,7 +229,7 @@ const Game = () => {
                 {player.hand.map((card, index) => (
                     <styles.Card
                         key={`${player.id}-${index}`}
-                        src={images["card" + card.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
+                        src={images["card" + card.toLowerCase()]}
                         $flip={true}
                         $isShackles={false}
                         onClick={() => playCard(player.id, index)}
