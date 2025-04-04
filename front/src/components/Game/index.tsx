@@ -20,18 +20,29 @@ const Game = () => {
       socket.emit("distributeCards");
     });
 
-    socket.on("cardsDistributed", (playersData, shacklesData) => {
-      setPlayers(playersData);
-      setShackles(shacklesData);
+    socket.on("deckCreated", (data) => {
+      socket.emit("distributeCards");
     });
+
+    socket.on("cardsDistributed", (data) => {
+      console.log("Jogadores recebidos:", data);
+      setPlayers(data);
+    });
+
+    socket.on("shuffleDistributed", (data) => {
+      console.debug("Manilhas embaralhadas:", data);
+      console.debug("Manilhas:", data.shackles);
+      setShackles(data.shackles || []);
+    })
 
     socket.on("penis", (overallScore) => {
       setOverallScore(overallScore)
       console.log("eu sou gay: "+overallScore)
     })
+
     socket.on("tableUpdated", (updatedTable) => {
-      console.log("Table atualizada: " + updatedTable);
-      setTable(updatedTable);
+      console.log("Table atualizada: ", updatedTable);
+      setTable(updatedTable || []);
     });
 
     socket.on("gameStateUpdate", (gameState) => {
@@ -62,6 +73,7 @@ const Game = () => {
 
     // Novo manipulador para o evento "playerHandUpdated"
     socket.on("playerHandUpdated", (data) => {
+      console.log("Recebendo playerHandUpdated:", data);
       setPlayers((prevPlayers) =>
           prevPlayers.map((player) =>
               player.id === data.playerId
@@ -71,6 +83,7 @@ const Game = () => {
       );
     });
 
+
     return () => {
       socket.off("deckCreated");
       socket.off("cardsDistributed");
@@ -78,6 +91,8 @@ const Game = () => {
       socket.off("gameStateUpdate");
       socket.off("playerHandUpdated");
       socket.off("roundReset");
+      socket.off("updateScore");
+      socket.off("penis");
     };
   }, []);
 
@@ -85,29 +100,10 @@ const Game = () => {
     socket.emit("determineGameWinner", score);
   }, [score]);
 
-
   // Ao montar o componente, solicitar a criação do baralho
   useEffect(() => {
     socket.emit("newDeck");
   }, []);
-
-  // Função para jogar uma carta: emite o evento para o servidor
-  const playCard = (playerId, cardIndex) => {
-    const player = players.find((p) => p.id === playerId);
-    if (!player || !player.hand || cardIndex >= player.hand.length) return;
-
-    const selectedCard = player.hand[cardIndex];
-    console.log("`PlayCard: " + selectedCard);
-    console.log("Position: " + player.position);
-    console.log("playerId: " + playerId);
-    console.log("cardIndex: " + cardIndex);
-    socket.emit("playCard", {
-      playerId,
-      cardIndex,
-      card: selectedCard,
-      position: player.position,
-    });
-  };
 
   // Verifica se algum time atingiu 12 pontos para reiniciar o jogo
   useEffect(() => {
@@ -131,6 +127,24 @@ const Game = () => {
       });
     }
   }, [overallScore]);
+
+  // Função para jogar uma carta: emite o evento para o servidor
+  const playCard = (playerId, cardIndex) => {
+    const player = players.find((p) => p.id === playerId);
+    if (!player || !player.hand || cardIndex >= player.hand.length) return;
+
+    const selectedCard = player.hand[cardIndex];
+    console.log("`PlayCard: " + selectedCard);
+    console.log("Position: " + player.position);
+    console.log("playerId: " + playerId);
+    console.log("cardIndex: " + cardIndex);
+    socket.emit("playCard", {
+      playerId,
+      cardIndex,
+      card: selectedCard,
+      position: player.position,
+    });
+  };
 
   // Trata o clique direito para virar a carta (efeito visual local)
   const handleRightClick = (playerId, cardIndex, event) => {
@@ -220,20 +234,24 @@ const Game = () => {
           </styles.Mesa>
           {players.map((player) => (
               <styles.CardContainer key={player.id} $position={player.position}>
-                {player.hand.map((card, index) => (
+                {player.hand.map((card, index) =>{ console.log("PlayerID: ", player.id); return (
+
                     <styles.Card
                         key={`${player.id}-${index}`}
-                        src={images["card" + card.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
-                        $flip={true}
+                        src={player.id
+                            ? images["card" + card.toLowerCase()]
+                            : images["card-back.png"]}
+                        $flip={player.id} // Apenas o jogador local vê suas cartas
                         $isShackles={false}
                         onClick={() => playCard(player.id, index)}
                         onContextMenu={(event) =>
                             handleRightClick(player.id, index, event)
                         }
                     />
-                ))}
+                )})}
               </styles.CardContainer>
           ))}
+
         </styles.Container>
       </>
   );
