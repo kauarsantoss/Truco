@@ -146,6 +146,16 @@ const Game = () => {
     });
   };
 
+  const getPositionByPlayerId = (playerPosition: string): number => {
+    switch (playerPosition) {
+      case "bottom": return 1;
+      case "left": return 2;
+      case "top": return 3;
+      case "right": return 4;
+      default: return 0;
+    }
+  };
+
   // Trata o clique direito para virar a carta (efeito visual local)
   const handleRightClick = (playerId, cardIndex, event) => {
     event.preventDefault();
@@ -234,14 +244,18 @@ const Game = () => {
           </styles.Mesa>
           {players.map((player) => (
               <styles.CardContainer key={player.id} $position={player.position}>
-                {player.hand.map((card, index) =>{ console.log("PlayerID: ", player.id); return (
-
+                {player.hand.map((card, index) =>{ 
+                  console.log("PositionPlayer: ", player.position)
+                  console.log("PositionReturnFunction: ", getPositionByPlayerId(player.position) )
+                  console.log(`Player ${player.id} | Position: ${player.position} | Hand:`, player.hand);
+                  console.log("PlayerID: ", player.id); return (
                     <styles.Card
                         key={`${player.id}-${index}`}
-                        src={player.id
+                        src={
+                          player.id === getPositionByPlayerId(player.position)
                             ? images["card" + card.toLowerCase()]
-                            : images["card-back.png"]}
-                        $flip={player.id} // Apenas o jogador local vê suas cartas
+                            : images["card-back.png"]
+                        }
                         $isShackles={false}
                         onClick={() => playCard(player.id, index)}
                         onContextMenu={(event) =>
