@@ -211,11 +211,14 @@ export class AppGateway
     if (!player) return;
 
     const selectedCard = player.hand[payload.cardIndex];
+    this.logger.log(`Jogador ${player.id} jogando carta no índice: ${payload.cardIndex}`);
+    this.logger.log(`Mão atual: ${JSON.stringify(player.hand)}`);
     if (!selectedCard) return;
 
     // Remover a carta da mão do jogador
     const initialTableLength = this.gameState.table.length;
     player.hand = player.hand.filter((_, index) => index !== payload.cardIndex);
+    this.logger.log(`Mão após remoção: ${JSON.stringify(player.hand)}`);
 
     // Adicionar a carta à mesa
     this.gameState.table.push({
@@ -230,7 +233,7 @@ export class AppGateway
         (p) => p.playerId === payload.playerId,
     );
     if (playerSocket) {
-      this.server.to(playerSocket.socketId).emit('playerHandUpdated', {
+      this.server.emit('playerHandUpdated', {
         playerId: player.id,
         hand: player.hand,
       });
@@ -500,28 +503,16 @@ export class AppGateway
   // Conexão com o cliente
   handleConnection(client: Socket) {
     this.logger.log(`Cliente conectado: ${client.id}`);
-
-    // Verifica se já existem 4 jogadores
-    if (this.connectedPlayers.length >= 4) {
-      client.disconnect(); // Se já tem 4, rejeita novos jogadores
-      this.logger.warn('Já existem 4 jogadores conectados. Conexão rejeitada.');
-      return;
-    }
+    setTimeout(() => {
+      client.emit('myPlayerId', newPlayerId);
+      this.logger.log(`Emitido myPlayerId: ${newPlayerId} para ${client.id}`);
+    }, 100);
 
     const newPlayerId = this.connectedPlayers.length + 1;
     this.connectedPlayers.push({ socketId: client.id, playerId: newPlayerId });
     this.logger.log(`Jogador ${newPlayerId} conectado.`);
 
-    // Atualizar todos os clientes sobre os jogadores conectados
-    this.server.emit('playersUpdated', { connectedPlayers: this.connectedPlayers });
-
-    // Se for o primeiro jogador, reseta o jogo
-    if (this.connectedPlayers.length === 1) {
-      this.logger.log(
-          'Primeiro cliente conectado. Resetando estado do jogo...',
-      );
-      this.resetGame();
-    }
+  
 
     // Quando atingir 4 jogadores, inicia a distribuição das cartas
     if (
