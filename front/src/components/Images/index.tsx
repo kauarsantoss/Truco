@@ -1,14 +1,11 @@
-// Importa todas as imagens dentro da pasta assets
-const images = import.meta.glob("../../assets/*.png", { eager: true });
-console.log("Imagens carregadas:", images);
-// Converte o objeto para facilitar o acesso às imagens
-const Images = Object.fromEntries(
-  Object.entries(images).map(([path, mod]) => [
-    path.replace("../../assets/", ""), // Remove "./assets/" do caminho
-    mod.default, // Pega o valor correto da imagem
-  ])
-);
+// Se estiver com Vite:
+const images = import.meta.glob("../../assets/*.png", { eager: true, as: 'url' });
 
-console.log("Imagens formatadas:", Images);
+const Images = Object.fromEntries(
+    Object.entries(images).map(([path, url]) => [
+        path.replace("../../assets/", ""),
+        url,
+    ])
+);
 
 export default Images;
