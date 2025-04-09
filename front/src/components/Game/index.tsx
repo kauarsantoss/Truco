@@ -5,7 +5,7 @@ import Swal from "sweetalert2";
 
 const Game = () => {
   const [deckId, setDeckId] = useState();
-  const [overallScore, setOverallScore] = useState({ nos: 11, eles: 11 });
+  const [overallScore, setOverallScore] = useState({ nos: 0, eles: 0 });
   const [shackles, setShackles] = useState([]);
   const [players, setPlayers] = useState([
     {
@@ -33,6 +33,11 @@ const Game = () => {
       position: "right",
     },
   ]);
+
+  const [bet, setBet] = useState(1); // Começa com 1 ponto
+  const [currentTurn, setCurrentTurn] = useState(1);
+  const [trucoRequest, setTrucoRequest] = useState<{ requestingPlayer: number | null; active: boolean }>({ requestingPlayer: null, active: false });
+
 
   useEffect(() => {
     const createDeck = async () => {
@@ -108,14 +113,18 @@ const Game = () => {
   const resetRound = () => {
     setScore({ rounds: 0, winners: [0, 0, 0] });
     setTable([]);
+    setCurrentTurn(1); // O primeiro jogador começa a nova rodada
     shuffle();
+    setBet(1)
     giveCards();
   };
+  
 
   const resetGame = () => {
     setScore({ rounds: 0, winners: [0, 0, 0] });
     setOverallScore({ nos: 0, eles: 0 });
     setTable([]);
+    setBet(1)
     shuffle();
     giveCards();
   };
@@ -129,13 +138,22 @@ const Game = () => {
     rounds: 0,
     winners: [0, 0, 0],
   });
+  const [trucoLevel, setTrucoLevel] = useState(0); // 0 = normal, 1 = truco, 2 = 6, 3 = 9, 4 = 12
 
   const playCard = (playerId, cardIndex) => {
-    const selectedCard = players.find((p) => p.id === playerId)?.hand[
-      cardIndex
-    ];
+    if (playerId !== currentTurn) {
+      Swal.fire({
+        title: "Não é sua vez!",
+        text: "Espere sua vez para jogar.",
+        icon: "warning",
+        confirmButtonText: "Ok",
+      });
+      return;
+    }
+  
+    const selectedCard = players.find((p) => p.id === playerId)?.hand[cardIndex];
     if (!selectedCard) return;
-
+  
     setPlayers((prevPlayers) =>
       prevPlayers.map((player) =>
         player.id === playerId
@@ -146,7 +164,7 @@ const Game = () => {
           : player
       )
     );
-
+  
     setTable((prevTable) => [
       ...prevTable,
       {
@@ -154,7 +172,10 @@ const Game = () => {
         position: players.find((p) => p.id === playerId)?.position,
       },
     ]);
-
+  
+    const nextTurn = playerId === 4 ? 1 : playerId + 1; // Ciclo entre 1 e 4
+    setCurrentTurn(nextTurn);
+  
     if (table.length === 3) {
       determineRoundWinner(
         [
@@ -253,28 +274,73 @@ const Game = () => {
   };
 
   const addPoints = (team) => {
+    console.log("Pontos adicionados para o time:", team, "Aposta:", bet);
+
     setScore((prevScore) => {
-      const newWinners = [...prevScore.winners];
+        const newWinners = [...prevScore.winners];
 
-      if (prevScore.rounds < 3) {
-        newWinners[prevScore.rounds] = team === "1" ? 1 : team === "2" ? 2 : 3; // 3 representa empate
-      }
+        if (prevScore.rounds < 3) {
+            newWinners[prevScore.rounds] = team === "1" ? 1 : team === "2" ? 2 : 3; // 3 representa empate
+        }
 
-      if (newWinners[0] === 3 && prevScore.rounds === 1) {
+        const countTeam1 = newWinners.filter((w) => w === 1).length;
+        const countTeam2 = newWinners.filter((w) => w === 2).length;
+        const countDraws = newWinners.filter((w) => w === 3).length;
+
+        let winningPoints = bet; // Quem vencer leva a aposta
+
+        // ✅ Se alguém já venceu duas rodadas, ganha a aposta
+        if (countTeam1 >= 2) {
+            setOverallScore((prev) => ({ ...prev, nos: prev.nos + winningPoints }));
+            resetRound();
+            return prevScore;
+        } else if (countTeam2 >= 2) {
+            setOverallScore((prev) => ({ ...prev, eles: prev.eles + winningPoints }));
+            resetRound();
+            return prevScore;
+        }
+
+        // ✅ Se houver 1 empate + 1 vitória, quem venceu leva a aposta
+        if (countDraws === 1 && (countTeam1 === 1 || countTeam2 === 1)) {
+            if (countTeam1 === 1) {
+                setOverallScore((prev) => ({ ...prev, nos: prev.nos + winningPoints }));
+            } else {
+                setOverallScore((prev) => ({ ...prev, eles: prev.eles + winningPoints }));
+            }
+            resetRound();
+            return prevScore;
+        }
+
+        // ✅ Se houver 2 empates, quem vencer a última rodada leva os pontos
+        if (countDraws === 2) {
+            // Se ainda não terminou a 3ª rodada, avança para ela
+            if (prevScore.rounds < 2) {
+                return {
+                    ...prevScore,
+                    rounds: prevScore.rounds + 1,
+                    winners: newWinners,
+                };
+            }
+
+            // Senão, já pode premiar o vencedor da 3ª rodada
+            const lastWinner = newWinners[2]; // Quem venceu a última rodada
+            if (lastWinner === 1) {
+                setOverallScore((prev) => ({ ...prev, nos: prev.nos + winningPoints }));
+            } else if (lastWinner === 2) {
+                setOverallScore((prev) => ({ ...prev, eles: prev.eles + winningPoints }));
+            }
+            resetRound();
+            return prevScore;
+        }
+
+        // Avança para a próxima rodada normalmente
         return {
-          ...prevScore,
-          rounds: 2,
-          winners: newWinners,
+            ...prevScore,
+            rounds: Math.min(prevScore.rounds + 1, 3),
+            winners: newWinners,
         };
-      }
-
-      return {
-        ...prevScore,
-        rounds: Math.min(prevScore.rounds + 1, 3),
-        winners: newWinners,
-      };
     });
-  };
+};
 
   useEffect(() => {
     determineGameWinner(score.rounds, score.winners);
@@ -330,17 +396,15 @@ const Game = () => {
     }
 };
 
-  
-
   useEffect(() => {
-    if (overallScore.nos === 12) {
+    if (overallScore.nos >= 12) {
       Swal.fire({
         title: "🏆 Parabéns!",
         text: "Nós ganhamos o jogo! 🎉",
         icon: "success",
         confirmButtonText: "Jogar novamente",
       }).then(() => resetGame());
-    } else if (overallScore.eles === 12) {
+    } else if (overallScore.eles >= 12) {
       Swal.fire({
         title: "😢 Fim de jogo!",
         text: "Eles ganharam! Vamos tentar de novo?",
@@ -376,6 +440,74 @@ const Game = () => {
     );
   };
 
+  const getNextBet = (currentBet: number): number => {
+    switch (currentBet) {
+      case 1: return 3;
+      case 3: return 6;
+      case 6: return 9;
+      case 9: return 12;
+      default: return 12;
+    }
+  };
+  
+  
+  const [lastTrucoRequester, setLastTrucoRequester] = useState<number | null>(null);
+
+
+  const requestTruco = (playerId: number) => {
+    if (trucoRequest.active || bet >= 12) return;
+  
+    if (playerId !== currentTurn) {
+      Swal.fire({
+        title: "Não é sua vez!",
+        text: "Você só pode pedir truco quando for sua vez de jogar.",
+        icon: "warning",
+        confirmButtonText: "Ok",
+      });
+      return;
+    }
+  
+    const adversario = playerId % 2 === 0 ? "Nós" : "Eles";
+    const novaAposta = getNextBet(bet);
+  
+    const mostrarDialogo = (valor: number) => {
+      Swal.fire({
+        title: `Truco! Valendo ${valor} pontos!`,
+        text: `${adversario}, aceita, recusa ou aumenta a aposta?`,
+        icon: "question",
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: "Aceitar",
+        denyButtonText: "Recusar",
+        cancelButtonText: valor < 12 ? "Aumentar" : undefined,
+      }).then((resposta) => {
+        if (resposta.isConfirmed) {
+          setBet(valor);
+          setTrucoRequest({ requestingPlayer: null, active: false });
+          Swal.fire({
+            title: "Truco Aceito!",
+            text: `A rodada agora vale ${valor} pontos!`,
+            icon: "success",
+          });
+        } else if (resposta.isDenied) {
+          const timeQueGanhou = playerId % 2 === 0 ? "eles" : "nos";
+          setOverallScore((prev) => ({
+            ...prev,
+            [timeQueGanhou]: prev[timeQueGanhou] + bet,
+          }));
+          setTrucoRequest({ requestingPlayer: null, active: false });
+          resetRound();
+        } else if (resposta.dismiss === Swal.DismissReason.cancel && valor < 12) {
+          const proximaAposta = getNextBet(valor);
+          mostrarDialogo(proximaAposta); // repete o fluxo com o novo valor
+        }
+      });
+    };
+  
+    setTrucoRequest({ requestingPlayer: playerId, active: true });
+    mostrarDialogo(novaAposta);
+  };
+  
   return (
     <>
       <styles.Shackles>
@@ -431,6 +563,7 @@ const Game = () => {
             {overallScore.eles}
           </styles.They>
         </styles.Scoreboard>
+        
         <styles.Mesa>
           {table.map((item, index) => (
             <styles.TableCard
@@ -441,6 +574,10 @@ const Game = () => {
             />
           ))}
         </styles.Mesa>
+        <styles.TrucoButton onClick={() => requestTruco(currentTurn)} disabled={bet == 12 || trucoRequest.active}>
+  {trucoRequest.active ? "Aguardando resposta..." : "Pedir Truco"}
+</styles.TrucoButton>
+
         {players.map((player) => (
           <styles.CardContainer key={player.id} $position={player.position}>
             {player.hand.map((card, index) => (
@@ -455,9 +592,11 @@ const Game = () => {
                 }
               />
             ))}
+            
           </styles.CardContainer>
         ))}
       </styles.Container>
+      
     </>
   );
 };
