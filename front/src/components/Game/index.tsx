@@ -7,6 +7,7 @@ import io from "socket.io-client";
 const socket = io("http://localhost:3333");
 
 const Game = () => {
+  const [myPlayerId, setMyPlayerId] = useState(0)
   const [overallScore, setOverallScore] = useState({ nos: 0, eles: 0 });
   const [shackles, setShackles] = useState([]);
   const [players, setPlayers] = useState([]);
@@ -18,9 +19,24 @@ const Game = () => {
       socket.emit("distributeCards");
     });
 
-    socket.on("cardsDistributed", (playersData, shacklesData) => {
-      setPlayers(playersData);
-      setShackles(shacklesData);
+    socket.on("myPlayerId",(data) =>{
+      console.log("Meu player ID: "+ data)
+      setMyPlayerId(data)
+    })
+
+    socket.on("deckCreated", (data) => {
+      socket.emit("distributeCards");
+    });
+
+    socket.on("cardsDistributed", (data) => {
+      console.log("Jogadores recebidos:", data);
+      setPlayers(data);
+    });
+
+    socket.on("shuffleDistributed", (data) => {
+      console.debug("Manilhas embaralhadas:", data);
+      console.debug("Manilhas:", data.shackles);
+      setShackles(data.shackles || []);
     });
 
     socket.on("teste", (data) => {
@@ -54,14 +70,10 @@ const Game = () => {
       });
     });
 
-
-    // Novo manipulador para o evento "playerHandUpdated"
     socket.on("playerHandUpdated", (data) => {
       setPlayers((prevPlayers) =>
           prevPlayers.map((player) =>
-              player.id === data.playerId
-                  ? { ...player, hand: data.hand }
-                  : player
+              player.id === data.playerId ? { ...player, hand: data.hand } : player
           )
       );
     });
@@ -102,6 +114,7 @@ const Game = () => {
     });
   };
 
+  // Verifica se algum time atingiu 12 pontos para reiniciar o jogo
   useEffect(() => {
     if (overallScore.nos === 12) {
       Swal.fire({
@@ -135,7 +148,6 @@ const Game = () => {
       });
     }
   }, [overallScore]);
-  
 
 
 
@@ -218,7 +230,7 @@ const Game = () => {
             {table.map((item, index) => (
                 <styles.TableCard
                     key={index}
-                    src={images["card" + item.card.toLowerCase()]}
+                    src={images["card" + item.card.toLowerCase()]} // Faz lookup usando a chave enviada (ex.: "card3h.png")
                     $flip={true}
                     $position={item.position}
                 />
@@ -226,18 +238,37 @@ const Game = () => {
           </styles.Mesa>
           {players.map((player) => (
               <styles.CardContainer key={player.id} $position={player.position}>
-                {player.hand.map((card, index) => (
-                    <styles.Card
-                        key={`${player.id}-${index}`}
-                        src={images["card" + card.toLowerCase()]}
-                        $flip={true}
-                        $isShackles={false}
-                        onClick={() => playCard(player.id, index)}
-                        onContextMenu={(event) =>
-                            handleRightClick(player.id, index, event)
-                        }
-                    />
-                ))}
+                {player.hand.map((card, index) => {
+                  console.log("PositionPlayer: ", player.position);
+                  console.log(
+                      `Player ${player.id} | Position: ${player.position} | Hand:`,
+                      player.hand
+                  );
+                  console.log("PlayerID: ", player.id);
+                  console.log("Meu playerID parte2: ",myPlayerId);
+                  console.log("O que estou passando para carta da mão: ", "card" + card.toLowerCase())
+                  console.log("Cartas da mão: ",images["card" + card.toLowerCase()])
+                  console.log("Carta Teste: ",images["cardjh.png"])
+                  return (
+                      <styles.Card
+                          key={`${player.id}-${index}`}
+                          src={
+                            player.id === myPlayerId
+                                ? images["card" + card.toLowerCase()]
+                                :images["card-back.png"]
+                          }
+                          $isShackles={false}
+                          onClick={() => {
+                            if (player.id === myPlayerId) {
+                              playCard(player.id, index);
+                            }
+                          }}
+                          onContextMenu={(event) =>
+                              handleRightClick(player.id, index, event)
+                          }
+                      />
+                  );
+                })}
               </styles.CardContainer>
           ))}
         </styles.Container>
