@@ -115,7 +115,7 @@ export const CardContainer = styled.div<{ $position?: string }>`
   }
 `;
 
-export const Card = styled.img<{ $flip?: boolean, $isShackles?: boolean }>`
+export const Card = styled.img<{$isShackles?: boolean }>`
   width: ${({ $isShackles }) => ($isShackles ? "45px" : "80px")}; /* Ajuste conforme o valor de isShackles */
   cursor: pointer;
   transition: transform 0.2s ease-in-out;
