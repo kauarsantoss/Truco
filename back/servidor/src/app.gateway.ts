@@ -309,15 +309,13 @@ export class AppGateway
                 const winningSuitIndex = suitPriority.indexOf(winningCardSuit.toUpperCase());
 
                 if (currentSuitIndex > winningSuitIndex) {
-                    winningCards = [currentCard]; // Novo vencedor por naipe
+                    winningCards = [currentCard];
                 }
             }
-            continue; // Se for manilha, não precisa comparar força normal
+            continue;
         }
 
-        // Se ainda não tem manilha, segue a lógica normal de comparação de força
         if (!isWinningShackle) {
-                    // Obtém o índice de força das cartas
             const currentForce = force.indexOf(currentCardValue);
             const winningForce = force.indexOf(winningCardValue);
 
