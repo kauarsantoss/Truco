@@ -38,7 +38,8 @@ const Game = () => {
   const [bet, setBet] = useState(1);
   const [currentTurn, setCurrentTurn] = useState(1);
   const [trucoRequest, setTrucoRequest] = useState<{ requestingPlayer: number | null; active: boolean }>({ requestingPlayer: null, active: false });
-
+  const [trucoEnabled, setTrucoEnabled] = useState(true);
+  const [cartasVisiveis, setCartasVisiveis] = useState(true);
 
   useEffect(() => {
     const createDeck = async () => {
@@ -413,6 +414,10 @@ const Game = () => {
   }, [score]);
 
   const handleRightClick = (playerId, cardIndex, event) => {
+    if (overallScore.nos === 11 && overallScore.eles === 11) {
+      return;
+    }
+    
     event.preventDefault(); 
     setPlayers((prevPlayers) =>
       prevPlayers.map((player) =>
@@ -499,13 +504,25 @@ const Game = () => {
   };
 
   const handleMaoDe11 = () => {
-    if (overallScore.nos === 11 || overallScore.eles === 11) {
-      setMaoDe11Decidida(false); 
+    if (overallScore.nos === 11 && overallScore.eles === 11) {
+      setMaoDe11Decidida(true);
+      setCartasVisiveis(false); // esconder cartas
+      setTrucoEnabled(false);   // desabilitar pedido de truco
+      setBet(3);                // a rodada vale 3 pontos automaticamente
+    } else if (overallScore.nos === 11 || overallScore.eles === 11) {
+      setMaoDe11Decidida(false);
+      setCartasVisiveis(true);  // cartas visíveis até aceitar ou recusar
+      setTrucoEnabled(false);   // desabilita pedido de truco temporariamente
+    } else {
+      setCartasVisiveis(true);  // todas as cartas visíveis normalmente
+      setTrucoEnabled(true);
     }
   };
+  
   useEffect(() => {
     handleMaoDe11();
   }, [overallScore]);
+  
   const handleAceitarMaoDe11 = () => {
     setMaoDe11Decidida(true);
     setBet(3);
@@ -586,31 +603,40 @@ const Game = () => {
               $position={item.position}
             />
           ))}
-          {
-            (overallScore.nos === 11 || overallScore.eles === 11) && !maoDe11Decidida && (
+          {(overallScore.nos === 11 || overallScore.eles === 11) &&
+            !maoDe11Decidida &&
+            !(overallScore.nos === 11 && overallScore.eles === 11) && (
               <div>
-                <styles.AceitarButton onClick={handleAceitarMaoDe11}>Aceitar</styles.AceitarButton>
-                <styles.RecusarButton onClick={handleRecusarMaoDe11}>Recusar</styles.RecusarButton>
+                <p>Uma das duplas chegou a 11 pontos! Aceita jogar com essas cartas?</p>
+                <styles.AceitarButton onClick={handleAceitarMaoDe11}>
+                  Aceitar
+                </styles.AceitarButton>
+                <styles.RecusarButton onClick={handleRecusarMaoDe11}>
+                  Recusar
+                </styles.RecusarButton>
               </div>
-            )
-          }   
+          )}
+ 
         </styles.Mesa>
-        <styles.TrucoButton onClick={() => requestTruco(currentTurn)} disabled={bet == 12 || trucoRequest.active}>
+        <styles.TrucoButton
+          onClick={() => requestTruco(currentTurn)}
+          disabled={!trucoEnabled || bet === 12 || trucoRequest.active}
+        >
           {trucoRequest.active ? "Aguardando resposta..." : "Pedir Truco"}
         </styles.TrucoButton>
         {players.map((player) => (
           <styles.CardContainer key={player.id} $position={player.position}>
             {player.hand.map((card, index) => (
               <styles.Card
-                key={`${player.id}-${index}`}
-                src={card}
-                $flip={true}
-                $isShackles={false}
-                onClick={() => playCard(player.id, index)}
-                onContextMenu={(event) =>
-                  handleRightClick(player.id, index, event)
-                }
-              />
+              key={`${player.id}-${index}`}
+              src={cartasVisiveis ? card : images["card-back.png"]}
+              $flip={cartasVisiveis}
+              $isShackles={false}
+              onClick={() => playCard(player.id, index)}
+              onContextMenu={(event) =>
+                handleRightClick(player.id, index, event)
+              }
+            />
             ))}
           </styles.CardContainer>
         ))}
