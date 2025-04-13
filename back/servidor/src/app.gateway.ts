@@ -440,7 +440,12 @@ export class AppGateway
   
     let winningTeam: 'nos' | 'eles' | null = null;
   
-    // Caso: dois empates seguidos, quem vencer o terceiro round ganha
+    if (score.rounds === 3 && draws === 3) {
+      this.logger.debug('Todos os rounds empataram. Ninguém pontua.');
+      this.resetRound();
+      return;
+    }
+  
     if (score.rounds === 3 && score.winners[0] === 3 && score.winners[1] === 3) {
       if (score.winners[2] === 1) {
         this.gameState.overallScore.nos++;
@@ -451,8 +456,7 @@ export class AppGateway
       }
     }
   
-    // Novo caso: empate no primeiro round e vitória no segundo → esse time vence
-    if (score.rounds >= 2 && score.winners[0] === 3) {
+    if (score.rounds >= 2 && score.winners[0] === 3 && !winningTeam) {
       if (score.winners[1] === 1) {
         this.gameState.overallScore.nos++;
         winningTeam = 'nos';
@@ -462,8 +466,7 @@ export class AppGateway
       }
     }
   
-    // Caso: empate no primeiro round, vitórias no segundo e terceiro
-    if (score.rounds === 3 && score.winners[0] === 3) {
+    if (score.rounds === 3 && score.winners[0] === 3 && !winningTeam) {
       if (score.winners[1] === 1 && score.winners[2] === 1) {
         this.gameState.overallScore.nos++;
         winningTeam = 'nos';
@@ -473,7 +476,6 @@ export class AppGateway
       }
     }
   
-    // Caso padrão: 2 vitórias diretas
     if (!winningTeam) {
       if (nosWins === 2) {
         this.gameState.overallScore.nos++;
@@ -484,7 +486,6 @@ export class AppGateway
       }
     }
   
-    // Emitir resultado e resetar se necessário
     if (winningTeam) {
       this.server.emit('teste', {
         overallScore: this.gameState.overallScore,
@@ -507,15 +508,13 @@ export class AppGateway
       this.resetRound();
     }
   
-    // Atualiza placar
     this.server.emit('updateScore', {
       overallScore: this.gameState.overallScore,
       score: this.gameState.score,
     });
   
     this.logger.error('Placar final da rodada:', this.gameState.overallScore);
-  }
-  
+  }  
 
   // Resetar a rodada
   resetRound(): void {
