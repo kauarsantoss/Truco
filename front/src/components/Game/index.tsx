@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 
 const Game = () => {
   const [deckId, setDeckId] = useState();
+  const [maoDe11Decidida, setMaoDe11Decidida] = useState(false);
   const [overallScore, setOverallScore] = useState({ nos: 0, eles: 0 });
   const [shackles, setShackles] = useState([]);
   const [players, setPlayers] = useState([
@@ -119,7 +120,6 @@ const Game = () => {
     giveCards();
   };
   
-
   const resetGame = () => {
     setScore({ rounds: 0, winners: [0, 0, 0] });
     setOverallScore({ nos: 0, eles: 0 });
@@ -497,7 +497,30 @@ const Game = () => {
     setTrucoRequest({ requestingPlayer: playerId, active: true });
     mostrarDialogo(novaAposta, bet, teamProponente);
   };
+
+  const handleMaoDe11 = () => {
+    if (overallScore.nos === 11 || overallScore.eles === 11) {
+      setMaoDe11Decidida(false); 
+    }
+  };
+  useEffect(() => {
+    handleMaoDe11();
+  }, [overallScore]);
+  const handleAceitarMaoDe11 = () => {
+    setMaoDe11Decidida(true);
+    setBet(3);
+  };
   
+  const handleRecusarMaoDe11 = () => {
+    setMaoDe11Decidida(true);
+    if (overallScore.nos === 11) {
+      setOverallScore({ nos: overallScore.nos, eles: overallScore.eles + 1 });
+    } else {
+      setOverallScore({ nos: overallScore.nos + 1, eles: overallScore.eles });
+    }
+    resetRound();
+  };
+    
   return (
     <>
       <styles.Shackles>
@@ -563,11 +586,18 @@ const Game = () => {
               $position={item.position}
             />
           ))}
+          {
+            (overallScore.nos === 11 || overallScore.eles === 11) && !maoDe11Decidida && (
+              <div>
+                <styles.AceitarButton onClick={handleAceitarMaoDe11}>Aceitar</styles.AceitarButton>
+                <styles.RecusarButton onClick={handleRecusarMaoDe11}>Recusar</styles.RecusarButton>
+              </div>
+            )
+          }   
         </styles.Mesa>
         <styles.TrucoButton onClick={() => requestTruco(currentTurn)} disabled={bet == 12 || trucoRequest.active}>
-  {trucoRequest.active ? "Aguardando resposta..." : "Pedir Truco"}
-</styles.TrucoButton>
-
+          {trucoRequest.active ? "Aguardando resposta..." : "Pedir Truco"}
+        </styles.TrucoButton>
         {players.map((player) => (
           <styles.CardContainer key={player.id} $position={player.position}>
             {player.hand.map((card, index) => (
@@ -582,7 +612,6 @@ const Game = () => {
                 }
               />
             ))}
-            
           </styles.CardContainer>
         ))}
       </styles.Container>
