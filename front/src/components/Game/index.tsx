@@ -13,6 +13,23 @@ const Game = () => {
   const [players, setPlayers] = useState([]);
   const [table, setTable] = useState([]);
   const [score, setScore] = useState({ rounds: 0, winners: [0, 0, 0] });
+  const [bet, setBet] = useState(1);
+  const [currentTurn, setCurrentTurn] = useState(1);
+  const [trucoRequest, setTrucoRequest] = useState<{ requestingPlayer: number | null; active: boolean }>({ requestingPlayer: null, active: false });
+
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = ""; // Isso é necessário para que o aviso apareça nos navegadores modernos
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   useEffect(() => {
     socket.on("deckCreated", (data) => {
@@ -154,24 +171,35 @@ const Game = () => {
   const handleRightClick = (playerId, cardIndex, event) => {
     event.preventDefault();
     setPlayers((prevPlayers) =>
-        prevPlayers.map((player) =>
-            player.id === playerId
-                ? {
-                  ...player,
-                  hand: player.hand.map((card, index) => {
-                    if (index === cardIndex) {
-                      return card === "-back.png"
-                          ? player.originalHand[index]
-                          : "-back.png";
-                    }
-                    return card;
-                  }),
-                }
-                : player
-        )
+      prevPlayers.map((player) => {
+        if (player.id !== playerId) return player;
+  
+        const isCardBack = player.hand[cardIndex] === "-back.png";
+        const originalHand = player.originalHand ?? [...player.hand];
+  
+        const updatedHand = player.hand.map((card, index) => {
+          if (index === cardIndex) {
+            return isCardBack ? originalHand[index] : "-back.png";
+          }
+          return card;
+        });
+  
+        // 👇 envia para o servidor a mão atualizada do jogador
+        socket.emit("updateHand", {
+          playerId,
+          hand: updatedHand,
+        });
+  
+        return {
+          ...player,
+          hand: updatedHand,
+          originalHand,
+        };
+      })
     );
-  };
-
+  };  
+  
+  
   return (
       <>
         <styles.Shackles>

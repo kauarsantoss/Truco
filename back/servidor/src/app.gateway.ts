@@ -194,6 +194,19 @@ export class AppGateway
     }
   }
 
+  @SubscribeMessage('updateHand')
+  updateHand(
+    client: Socket,
+    payload: { playerId: number; hand: any[] },
+  ): void {
+    const player = this.gameState.players.find((p) => p.id === payload.playerId);
+    if (player) {
+      player.hand = payload.hand; // Atualiza a mão do jogador
+    }
+  }
+
+  
+
   // Lógica para jogar uma carta
   @SubscribeMessage('playCard')
   playCard(
@@ -250,7 +263,7 @@ export class AppGateway
 
   determineRoundWinner(): void {
     const force = [
-      'card-back',
+      '-BACK',
       '4',
       '5',
       '6',
@@ -264,6 +277,9 @@ export class AppGateway
     ];
 
     const getCardValue = (cardImage: string): string => {
+      if (cardImage.includes('-back')) {
+        return '-back';
+      }
       const match = cardImage.match(/(\d+|[kqja])([dshc])\.png/);
       return match ? match[1].toLowerCase() : '';
     };
@@ -415,115 +431,91 @@ export class AppGateway
   }
 
   determineGameWinner(score: { rounds: number; winners: number[] }): void {
-    this.logger.error('pqpq scorre.rounds:', score.rounds);
-    this.logger.error('pqpq scorre.winners:', score.winners);
+    this.logger.error('score.rounds:', score.rounds);
+    this.logger.error('score.winners:', score.winners);
+  
+    const nosWins = score.winners.filter((w) => w === 1).length;
+    const elesWins = score.winners.filter((w) => w === 2).length;
+    const draws = score.winners.filter((w) => w === 3).length;
+  
+    let winningTeam: 'nos' | 'eles' | null = null;
+  
+    // Caso: dois empates seguidos, quem vencer o terceiro round ganha
+    if (score.rounds === 3 && score.winners[0] === 3 && score.winners[1] === 3) {
+      if (score.winners[2] === 1) {
+        this.gameState.overallScore.nos++;
+        winningTeam = 'nos';
+      } else if (score.winners[2] === 2) {
+        this.gameState.overallScore.eles++;
+        winningTeam = 'eles';
+      }
+    }
+  
+    // Novo caso: empate no primeiro round e vitória no segundo → esse time vence
     if (score.rounds >= 2 && score.winners[0] === 3) {
       if (score.winners[1] === 1) {
         this.gameState.overallScore.nos++;
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-        if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
+        winningTeam = 'nos';
       } else if (score.winners[1] === 2) {
         this.gameState.overallScore.eles++;
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
+        winningTeam = 'eles';
       }
-
-      this.resetRound();
     }
-
-    if (score.rounds === 2 && score.winners[1] === 3) {
-      if (score.winners[0] === 1) {
-        this.gameState.overallScore.nos++;
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
-      } else if (score.winners[0] === 2) {
-        this.gameState.overallScore.eles++;
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
-      }
-      this.resetRound();
-    }
-
-    const nosWins = score.winners.filter((w) => w === 1).length;
-    const elesWins = score.winners.filter((w) => w === 2).length;
-
-    let winningTeam;
-
-    if (nosWins === 2) {
+  
+    // Caso: empate no primeiro round, vitórias no segundo e terceiro
+    if (score.rounds === 3 && score.winners[0] === 3) {
+      if (score.winners[1] === 1 && score.winners[2] === 1) {
         this.gameState.overallScore.nos++;
         winningTeam = 'nos';
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
+      } else if (score.winners[1] === 2 && score.winners[2] === 2) {
+        this.gameState.overallScore.eles++;
+        winningTeam = 'eles';
+      }
+    }
+  
+    // Caso padrão: 2 vitórias diretas
+    if (!winningTeam) {
+      if (nosWins === 2) {
+        this.gameState.overallScore.nos++;
+        winningTeam = 'nos';
       } else if (elesWins === 2) {
         this.gameState.overallScore.eles++;
         winningTeam = 'eles';
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
-    }
-
-
-    if (score.rounds === 3 && score.winners[2] === 3) {
-      if (score.winners[0] === 1) {
-        this.gameState.overallScore.nos++;
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
-      } else if (score.winners[0] === 2) {
-        this.gameState.overallScore.eles++;
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
       }
-      this.resetRound();
     }
-
-    this.logger.error('pqpq:', this.gameState.overallScore);
+  
+    // Emitir resultado e resetar se necessário
     if (winningTeam) {
+      this.server.emit('teste', {
+        overallScore: this.gameState.overallScore,
+      });
+  
       this.logger.debug(`Jogo encerrado! Vencedor: ${winningTeam}`);
-
+  
       this.server.emit('gameEnded', {
         winner: winningTeam,
         overallScore: this.gameState.overallScore,
       });
-
+  
+      if (
+        this.gameState.overallScore.nos === 12 ||
+        this.gameState.overallScore.eles === 12
+      ) {
+        this.resetGame();
+      }
+  
       this.resetRound();
     }
-
+  
+    // Atualiza placar
     this.server.emit('updateScore', {
       overallScore: this.gameState.overallScore,
       score: this.gameState.score,
     });
+  
+    this.logger.error('Placar final da rodada:', this.gameState.overallScore);
   }
+  
 
   // Resetar a rodada
   resetRound(): void {
