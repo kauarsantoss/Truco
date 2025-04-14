@@ -15,6 +15,10 @@ const Game = () => {
   const [score, setScore] = useState({ rounds: 0, winners: [0, 0, 0] });
   const [bet, setBet] = useState(1);
   const [oldBet, setOldBet] = useState(1);
+  const [trucoEnabled, setTrucoEnabled] = useState(true);
+  const [cartasVisiveis, setCartasVisiveis] = useState(true);
+  const [maoDe11Decidida, setMaoDe11Decidida] = useState(false);
+
 
 
   useEffect(() => {
@@ -322,8 +326,22 @@ const Game = () => {
             </styles.They>
           </styles.Scoreboard>
           <styles.Mesa>
+          {(overallScore.nos === 11 || overallScore.eles === 11) &&
+            !maoDe11Decidida &&
+            !(overallScore.nos === 11 && overallScore.eles === 11) && (
+              <div>
+                <p>Uma das duplas chegou a 11 pontos! Aceita jogar com essas cartas?</p>
+                <styles.AceitarButton onClick={handleAceitarMaoDe11}>
+                  Aceitar
+                </styles.AceitarButton>
+                <styles.RecusarButton onClick={handleRecusarMaoDe11}>
+                  Recusar
+                </styles.RecusarButton>
+              </div>
+          )}
           <styles.TrucoButton
           onClick={() =>socket.emit('requestTruco', { playerId: myPlayerId, bet:bet })}
+          disabled={!trucoEnabled || bet === 12}
           > Truco
           </styles.TrucoButton>
             {table.map((item, index) => (
@@ -352,9 +370,11 @@ const Game = () => {
                       <styles.Card
                           key={`${player.id}-${index}`}
                           src={
-                            player.id === myPlayerId
+                            !cartasVisiveis
+                              ? images["card-back.png"]
+                              : player.id === myPlayerId
                                 ? images["card" + card.toLowerCase()]
-                                :images["card-back.png"]
+                                : images["card-back.png"]
                           }
                           $isShackles={false}
                           onClick={() => {
