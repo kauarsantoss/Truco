@@ -13,6 +13,26 @@ const Game = () => {
   const [players, setPlayers] = useState([]);
   const [table, setTable] = useState([]);
   const [score, setScore] = useState({ rounds: 0, winners: [0, 0, 0] });
+  const [bet, setBet] = useState(1);
+  const [oldBet, setOldBet] = useState(1);
+  const [trucoEnabled, setTrucoEnabled] = useState(true);
+  const [cartasVisiveis, setCartasVisiveis] = useState(true);
+  const [maoDe11Decidida, setMaoDe11Decidida] = useState(false);
+
+
+
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = ""; // Isso é necessário para que o aviso apareça nos navegadores modernos
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
 
   useEffect(() => {
     socket.on("deckCreated", (data) => {
@@ -59,6 +79,15 @@ const Game = () => {
       setScore(gameState.score);
     });
 
+    socket.on("acceptTruco",(bet) =>{
+      setBet(bet)
+      Swal.fire({
+        title: "Truco Aceito!",
+        text: `A rodada agora vale ${bet} pontos!`,
+        icon: "success",
+      });
+    })
+
     socket.on("updateScore", (gameState) => {
       console.log("Recebendo updateScore: ", gameState);
 
@@ -96,6 +125,64 @@ const Game = () => {
   useEffect(() => {
     socket.emit("newDeck");
   }, []);
+  const handleTrucoRequested = (data) => {
+    Swal.close();
+    console.log("Recebi do back o que era pra rolar...")
+    const { listPlayers, requestingPlayer, newBet } = data;
+    console.log("Esse é o objeto que recebi do back", JSON.stringify(data, null, 2));
+    console.log("Esse é o meu playerID: ",myPlayerId)
+    // Se o jogador atual estiver na lista, mostra o modal
+    if (listPlayers.includes(myPlayerId)) {
+      console.log("Cai no if do Truco lek")
+      const quemPropôs = requestingPlayer % 2 === 0 ? "eles" : "nos";
+  
+      Swal.fire({
+        title: `Truco! Valendo ${newBet} pontos!`,
+        icon: "question",
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: "Aceitar",
+        denyButtonText: "Recusar",
+        cancelButtonText: newBet < 12 ? "Aumentar" : undefined,
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.alert("Jogador aceitou o truco");
+          socket.emit('acceptTruco', { quemPropos: quemPropôs, newBet: newBet });
+        } else if (result.isDenied) {
+          window.alert("Jogador recusou o truco");
+          console.log("bet correu: ",bet)
+          console.log("oldBet correu: ",oldBet)
+          let betAtual = 0
+
+          switch (newBet) {
+            case 3:
+              betAtual = 1;
+              break;
+            case 6:
+              betAtual = 3;
+              break;
+            case 9:
+              betAtual = 6;
+              break;
+            case 12:
+              betAtual = 9;
+              break;
+            default:
+              betAtual = 12;
+              break;
+          }
+          
+          socket.emit('runTruco', { quemPropos: quemPropôs, bet: betAtual })
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+          setOldBet(bet)
+          setBet(newBet)
+          socket.emit('requestTruco', { playerId: myPlayerId, bet:newBet })
+          }
+      });
+    }
+  };
+    
+  socket.on("trucoRequested", handleTrucoRequested);
 
   const playCard = (playerId, cardIndex) => {
     const player = players.find((p) => p.id === playerId);
@@ -154,24 +241,36 @@ const Game = () => {
   const handleRightClick = (playerId, cardIndex, event) => {
     event.preventDefault();
     setPlayers((prevPlayers) =>
-        prevPlayers.map((player) =>
-            player.id === playerId
-                ? {
-                  ...player,
-                  hand: player.hand.map((card, index) => {
-                    if (index === cardIndex) {
-                      return card === "-back.png"
-                          ? player.originalHand[index]
-                          : "-back.png";
-                    }
-                    return card;
-                  }),
-                }
-                : player
-        )
+      prevPlayers.map((player) => {
+        if (player.id !== playerId) return player;
+  
+        const isCardBack = player.hand[cardIndex] === "-back.png";
+        const originalHand = player.originalHand ?? [...player.hand];
+  
+        const updatedHand = player.hand.map((card, index) => {
+          if (index === cardIndex) {
+            return isCardBack ? originalHand[index] : "-back.png";
+          }
+          return card;
+        });
+  
+        // 👇 envia para o servidor a mão atualizada do jogador
+        socket.emit("updateHand", {
+          playerId,
+          hand: updatedHand,
+        });
+  
+        return {
+          ...player,
+          hand: updatedHand,
+          originalHand,
+        };
+      })
     );
   };
-
+  
+  
+  
   return (
       <>
         <styles.Shackles>
@@ -227,6 +326,24 @@ const Game = () => {
             </styles.They>
           </styles.Scoreboard>
           <styles.Mesa>
+          {(overallScore.nos === 11 || overallScore.eles === 11) &&
+            !maoDe11Decidida &&
+            !(overallScore.nos === 11 && overallScore.eles === 11) && (
+              <div>
+                <p>Uma das duplas chegou a 11 pontos! Aceita jogar com essas cartas?</p>
+                <styles.AceitarButton onClick={handleAceitarMaoDe11}>
+                  Aceitar
+                </styles.AceitarButton>
+                <styles.RecusarButton onClick={handleRecusarMaoDe11}>
+                  Recusar
+                </styles.RecusarButton>
+              </div>
+          )}
+          <styles.TrucoButton
+          onClick={() =>socket.emit('requestTruco', { playerId: myPlayerId, bet:bet })}
+          disabled={!trucoEnabled || bet === 12}
+          > Truco
+          </styles.TrucoButton>
             {table.map((item, index) => (
                 <styles.TableCard
                     key={index}
@@ -253,9 +370,11 @@ const Game = () => {
                       <styles.Card
                           key={`${player.id}-${index}`}
                           src={
-                            player.id === myPlayerId
+                            !cartasVisiveis
+                              ? images["card-back.png"]
+                              : player.id === myPlayerId
                                 ? images["card" + card.toLowerCase()]
-                                :images["card-back.png"]
+                                : images["card-back.png"]
                           }
                           $isShackles={false}
                           onClick={() => {

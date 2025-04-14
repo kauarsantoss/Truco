@@ -143,4 +143,49 @@ export const TableCard = styled(Card)<{ $position?: string }>`
   }}
 `;
 
-export default { Container, Card, CardContainer, Mesa, Scoreboard, TableCard, Us, They, Ball, Shackles, StorageShackles, Tittle};
+export const TrucoButton = styled.button`
+  background-color: #d32f2f;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: bold;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+  z-index: 1;
+
+  &:hover {
+    background-color: #b71c1c;
+    transform: scale(1.1);
+  }
+
+  &:disabled {
+    background-color: gray;
+    cursor: not-allowed;
+  }
+`;
+
+export const AceitarButton = styled.button`
+  background-color: #4CAF50; /* Verde para aceitar */
+  color: white;
+  padding: 10px 20px;
+  margin: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 100px;
+`;
+
+export const RecusarButton = styled.button`
+  background-color: #f44336; /* Vermelho para recusar */
+  color: white;
+  padding: 10px 20px;
+  margin: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+`;
+
+export default { Container, Card, CardContainer, Mesa, Scoreboard, TableCard, Us, They, Ball, Shackles, StorageShackles, Tittle, TrucoButton, AceitarButton, RecusarButton };
