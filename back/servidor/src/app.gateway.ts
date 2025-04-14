@@ -7,6 +7,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import e from 'express';
 import { Server, Socket } from 'socket.io';
 
 interface GameState {
@@ -22,6 +23,8 @@ interface GameState {
   overallScore: { nos: number; eles: number };
   score: { rounds: number; winners: number[] };
   deckId: string | null;
+  bet: number | 1;
+  answersPlayers: number[];
 }
 
 @WebSocketGateway({
@@ -65,6 +68,8 @@ export class AppGateway
     overallScore: { nos: 0, eles: 0 },
     score: { rounds: 0, winners: [0, 0, 0] },
     deckId: null,
+    bet: 1,
+    answersPlayers: [],
   };
   private connectedPlayers: { socketId: string; playerId: number }[] = [];
   private isRequesting = false;
@@ -205,7 +210,63 @@ export class AppGateway
     }
   }
 
-  
+  @SubscribeMessage('runTruco')
+  runTruco(
+      client: Socket,
+      payload: { quemPropos: string, bet:number},
+  ): void {
+    this.gameState.answersPlayers.push(2)
+    if(this.gameState.answersPlayers.length==2){
+    this.gameState.overallScore[payload.quemPropos] += payload.bet
+    this.server.emit('teste', {
+      overallScore: this.gameState.overallScore,
+    });
+    this.resetRound()
+    }
+  }
+
+  @SubscribeMessage('acceptTruco')
+  acceptTruco(
+      client: Socket,
+      payload: { quemPropos: string, newBet: number},
+  ): void {
+    this.gameState.answersPlayers.push(1)
+    if(this.gameState.answersPlayers.length == 2){
+      if(!this.gameState.answersPlayers.includes(2)){
+      this.gameState.bet = payload.newBet
+      this.server.emit('acceptTruco', 
+          this.gameState.bet
+      );
+      this.gameState.answersPlayers = []
+      }
+      else{
+        this.runTruco(client, {quemPropos: payload.quemPropos, bet: payload.newBet})
+      }
+  }
+  }
+
+  @SubscribeMessage('requestTruco')
+  requestTruco(
+      client: Socket,
+      payload: { playerId: number, bet:number},
+  ): void {
+    this.logger.log("Caiu no truco do back, e esse foi o playerId: "+payload.playerId)
+    const listPlayers: number[] = [];
+    const novaAposta = this.getNextBet(payload.bet);
+    if (payload.playerId % 2 === 0) {
+      listPlayers.push(1, 3);
+    } else {
+      listPlayers.push(2, 4);
+    }
+    this.logger.log("Eu to mandando isso para o front 1: "+listPlayers)
+    this.logger.log("Eu to mandando isso para o front 2: "+payload.playerId)
+    this.logger.log("Eu to mandando isso para o front 1: "+novaAposta)
+    this.server.emit('trucoRequested', {
+      listPlayers,
+      requestingPlayer: payload.playerId,
+      newBet: novaAposta,
+    });
+    }
 
   // Lógica para jogar uma carta
   @SubscribeMessage('playCard')
@@ -386,14 +447,25 @@ export class AppGateway
     this.server.emit('tableUpdated', []);
   }
 
+  getNextBet (currentBet: number): number {
+    switch (currentBet) {
+      case 1: return 3;
+      case 3: return 6;
+      case 6: return 9;
+      case 9: return 12;
+      default: return 12;
+    }
+  };
+
+
   // Adicionar pontos ao time vencedor
   addPoints(team: string): void {
     const winningTeam = team === '1' ? 1 : team === '2' ? 2 : 3;
-
+    
     // Atualizar apenas a rodada atual sem sobrescrever rodadas futuras
     if (this.gameState.score.rounds < 3) {
       this.gameState.score.winners[this.gameState.score.rounds] = winningTeam;
-      this.gameState.score.rounds++;
+      this.gameState.score.rounds ++;
     }
 
     this.logger.debug(
@@ -448,40 +520,40 @@ export class AppGateway
   
     if (score.rounds === 3 && score.winners[0] === 3 && score.winners[1] === 3) {
       if (score.winners[2] === 1) {
-        this.gameState.overallScore.nos++;
+        this.gameState.overallScore.nos+= this.gameState.bet;
         winningTeam = 'nos';
       } else if (score.winners[2] === 2) {
-        this.gameState.overallScore.eles++;
+        this.gameState.overallScore.eles+= this.gameState.bet;
         winningTeam = 'eles';
       }
     }
   
     if (score.rounds >= 2 && score.winners[0] === 3 && !winningTeam) {
       if (score.winners[1] === 1) {
-        this.gameState.overallScore.nos++;
+        this.gameState.overallScore.nos+= this.gameState.bet;
         winningTeam = 'nos';
       } else if (score.winners[1] === 2) {
-        this.gameState.overallScore.eles++;
+        this.gameState.overallScore.eles+= this.gameState.bet;
         winningTeam = 'eles';
       }
     }
   
     if (score.rounds === 3 && score.winners[0] === 3 && !winningTeam) {
       if (score.winners[1] === 1 && score.winners[2] === 1) {
-        this.gameState.overallScore.nos++;
+        this.gameState.overallScore.nos+= this.gameState.bet;
         winningTeam = 'nos';
       } else if (score.winners[1] === 2 && score.winners[2] === 2) {
-        this.gameState.overallScore.eles++;
+        this.gameState.overallScore.eles+= this.gameState.bet;
         winningTeam = 'eles';
       }
     }
   
     if (!winningTeam) {
       if (nosWins === 2) {
-        this.gameState.overallScore.nos++;
+        this.gameState.overallScore.nos+= this.gameState.bet;
         winningTeam = 'nos';
       } else if (elesWins === 2) {
-        this.gameState.overallScore.eles++;
+        this.gameState.overallScore.eles+= this.gameState.bet;
         winningTeam = 'eles';
       }
     }
@@ -523,7 +595,8 @@ export class AppGateway
     // Resetar placar da rodada
     this.gameState.score.rounds = 0;
     this.gameState.score.winners = [0, 0, 0];
-
+    this.gameState.bet = 1;
+    this.gameState.answersPlayers = []
     // Limpar a mesa e as manilhas
     this.gameState.table = [];
     this.gameState.shackles = [];
@@ -638,6 +711,8 @@ export class AppGateway
       overallScore: { nos: 0, eles: 0 },
       score: { rounds: 0, winners: [0, 0, 0] },
       deckId: null,
+      bet: 1,
+      answersPlayers: []
     };
 
     this.server.emit('gameReset', this.gameState);

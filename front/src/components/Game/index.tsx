@@ -14,8 +14,7 @@ const Game = () => {
   const [table, setTable] = useState([]);
   const [score, setScore] = useState({ rounds: 0, winners: [0, 0, 0] });
   const [bet, setBet] = useState(1);
-  const [currentTurn, setCurrentTurn] = useState(1);
-  const [trucoRequest, setTrucoRequest] = useState<{ requestingPlayer: number | null; active: boolean }>({ requestingPlayer: null, active: false });
+  const [oldBet, setOldBet] = useState(1);
 
 
   useEffect(() => {
@@ -76,6 +75,15 @@ const Game = () => {
       setScore(gameState.score);
     });
 
+    socket.on("acceptTruco",(bet) =>{
+      setBet(bet)
+      Swal.fire({
+        title: "Truco Aceito!",
+        text: `A rodada agora vale ${bet} pontos!`,
+        icon: "success",
+      });
+    })
+
     socket.on("updateScore", (gameState) => {
       console.log("Recebendo updateScore: ", gameState);
 
@@ -113,6 +121,64 @@ const Game = () => {
   useEffect(() => {
     socket.emit("newDeck");
   }, []);
+  const handleTrucoRequested = (data) => {
+    Swal.close();
+    console.log("Recebi do back o que era pra rolar...")
+    const { listPlayers, requestingPlayer, newBet } = data;
+    console.log("Esse é o objeto que recebi do back", JSON.stringify(data, null, 2));
+    console.log("Esse é o meu playerID: ",myPlayerId)
+    // Se o jogador atual estiver na lista, mostra o modal
+    if (listPlayers.includes(myPlayerId)) {
+      console.log("Cai no if do Truco lek")
+      const quemPropôs = requestingPlayer % 2 === 0 ? "eles" : "nos";
+  
+      Swal.fire({
+        title: `Truco! Valendo ${newBet} pontos!`,
+        icon: "question",
+        showDenyButton: true,
+        showCancelButton: true,
+        confirmButtonText: "Aceitar",
+        denyButtonText: "Recusar",
+        cancelButtonText: newBet < 12 ? "Aumentar" : undefined,
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.alert("Jogador aceitou o truco");
+          socket.emit('acceptTruco', { quemPropos: quemPropôs, newBet: newBet });
+        } else if (result.isDenied) {
+          window.alert("Jogador recusou o truco");
+          console.log("bet correu: ",bet)
+          console.log("oldBet correu: ",oldBet)
+          let betAtual = 0
+
+          switch (newBet) {
+            case 3:
+              betAtual = 1;
+              break;
+            case 6:
+              betAtual = 3;
+              break;
+            case 9:
+              betAtual = 6;
+              break;
+            case 12:
+              betAtual = 9;
+              break;
+            default:
+              betAtual = 12;
+              break;
+          }
+          
+          socket.emit('runTruco', { quemPropos: quemPropôs, bet: betAtual })
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+          setOldBet(bet)
+          setBet(newBet)
+          socket.emit('requestTruco', { playerId: myPlayerId, bet:newBet })
+          }
+      });
+    }
+  };
+    
+  socket.on("trucoRequested", handleTrucoRequested);
 
   const playCard = (playerId, cardIndex) => {
     const player = players.find((p) => p.id === playerId);
@@ -197,7 +263,8 @@ const Game = () => {
         };
       })
     );
-  };  
+  };
+  
   
   
   return (
@@ -255,6 +322,10 @@ const Game = () => {
             </styles.They>
           </styles.Scoreboard>
           <styles.Mesa>
+          <styles.TrucoButton
+          onClick={() =>socket.emit('requestTruco', { playerId: myPlayerId, bet:bet })}
+          > Truco
+          </styles.TrucoButton>
             {table.map((item, index) => (
                 <styles.TableCard
                     key={index}
