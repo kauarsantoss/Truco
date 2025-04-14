@@ -4,7 +4,7 @@ import Swal from "sweetalert2";
 import images from "../Images"
 import io from "socket.io-client";
 
-const socket = io("http://localhost:3333");
+const socket = io("https://truco-udic.onrender.com");
 
 const Game = () => {
   const [overallScore, setOverallScore] = useState({ nos: 0, eles: 0 });
