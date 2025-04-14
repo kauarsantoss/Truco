@@ -106,10 +106,10 @@ export class AppGateway
   // Distribuindo cartas
   @SubscribeMessage('distributeCards')
   async distributeCards(): Promise<void> {
-    if (this.gameState.players.every((player) => player.hand.length > 0)) {
+    /*    if (this.gameState.players.every((player) => player.hand.length > 0)) {
       this.logger.warn('Cartas já foram distribuídas.');
       return;
-    }
+    }*/
 
     if (this.connectedPlayers.length < 4) {
       this.logger.warn('Ainda não há 4 jogadores conectados. Aguardando...');
@@ -206,7 +206,9 @@ export class AppGateway
     if (!player) return;
 
     const selectedCard = player.hand[payload.cardIndex];
-    this.logger.log(`Jogador ${player.id} jogando carta no índice: ${payload.cardIndex}`);
+    this.logger.log(
+        `Jogador ${player.id} jogando carta no índice: ${payload.cardIndex}`,
+    );
     this.logger.log(`Mão atual: ${JSON.stringify(player.hand)}`);
     if (!selectedCard) return;
 
@@ -275,66 +277,68 @@ export class AppGateway
 
     let winningCards = [this.gameState.table[0]];
 
-
     for (let i = 1; i < this.gameState.table.length; i++) {
-        const currentCard = this.gameState.table[i];
-        const currentCardValue = getCardValue(currentCard.card).toUpperCase();
-        const currentCardSuit = getCardSuit(currentCard.card).toUpperCase();
-        const winningCardValue = getCardValue(winningCards[0].card).toUpperCase();
-        const winningCardSuit = getCardSuit(winningCards[0].card).toUpperCase();
+      const currentCard = this.gameState.table[i];
+      const currentCardValue = getCardValue(currentCard.card).toUpperCase();
+      const currentCardSuit = getCardSuit(currentCard.card).toUpperCase();
+      const winningCardValue = getCardValue(winningCards[0].card).toUpperCase();
+      const winningCardSuit = getCardSuit(winningCards[0].card).toUpperCase();
 
-        const isCurrentShackle = this.gameState.shackles.some((shackle) =>
-            shackle.id.includes(
-                currentCardValue + currentCardSuit,
-            ),
+      const isCurrentShackle = this.gameState.shackles.some((shackle) =>
+          shackle.id.includes(currentCardValue + currentCardSuit),
+      );
+
+      const isWinningShackle = this.gameState.shackles.some((shackle) =>
+          shackle.id.includes(winningCardValue + winningCardSuit),
+      );
+
+      if (isCurrentShackle) {
+        this.logger.error(
+            'É uma manilha: ' + currentCardValue + currentCardSuit,
         );
-
-        const isWinningShackle = this.gameState.shackles.some((shackle) =>
-            shackle.id.includes(
-                winningCardValue + winningCardSuit,
-            ),
-        );
-
-        if (isCurrentShackle) {
-            this.logger.error('É uma manilha: ' + currentCardValue + currentCardSuit);
-
-            if (!isWinningShackle) {
-                // Se ainda não há uma manilha vencendo, esta se torna a vencedora
-                winningCards = [currentCard];
-            } else {
-                // Se já há uma manilha, compara pelo naipe
-                const suitPriority = ['D', 'S', 'H', 'C']; // Ouros > Espadas > Copas > Paus
-
-                const currentSuitIndex = suitPriority.indexOf(currentCardSuit.toUpperCase());
-                const winningSuitIndex = suitPriority.indexOf(winningCardSuit.toUpperCase());
-
-                if (currentSuitIndex > winningSuitIndex) {
-                    winningCards = [currentCard];
-                }
-            }
-            continue;
-        }
 
         if (!isWinningShackle) {
-            const currentForce = force.indexOf(currentCardValue);
-            const winningForce = force.indexOf(winningCardValue);
+          // Se ainda não há uma manilha vencendo, esta se torna a vencedora
+          winningCards = [currentCard];
+        } else {
+          // Se já há uma manilha, compara pelo naipe
+          const suitPriority = ['D', 'S', 'H', 'C']; // Ouros > Espadas > Copas > Paus
 
-            // Adiciona logs para depuração
-            this.logger.error(`Comparando forças: ${currentCardValue}(${currentForce}) vs ${winningCardValue}(${winningForce})`);
+          const currentSuitIndex = suitPriority.indexOf(
+              currentCardSuit.toUpperCase(),
+          );
+          const winningSuitIndex = suitPriority.indexOf(
+              winningCardSuit.toUpperCase(),
+          );
 
-            // Se alguma carta não for encontrada na lista, evita comparações erradas
-            if (currentForce === -1 || winningForce === -1) {
-                this.logger.error("Erro: Carta não encontrada na lista de forças!");
-                continue;
-            }
-
-            if (currentForce > winningForce) {
-                winningCards = [currentCard];
-            } else if (currentForce === winningForce) {
-                winningCards.push(currentCard);
-            }
-
+          if (currentSuitIndex > winningSuitIndex) {
+            winningCards = [currentCard];
+          }
         }
+        continue;
+      }
+
+      if (!isWinningShackle) {
+        const currentForce = force.indexOf(currentCardValue);
+        const winningForce = force.indexOf(winningCardValue);
+
+        // Adiciona logs para depuração
+        this.logger.error(
+            `Comparando forças: ${currentCardValue}(${currentForce}) vs ${winningCardValue}(${winningForce})`,
+        );
+
+        // Se alguma carta não for encontrada na lista, evita comparações erradas
+        if (currentForce === -1 || winningForce === -1) {
+          this.logger.error('Erro: Carta não encontrada na lista de forças!');
+          continue;
+        }
+
+        if (currentForce > winningForce) {
+          winningCards = [currentCard];
+        } else if (currentForce === winningForce) {
+          winningCards.push(currentCard);
+        }
+      }
     }
 
     const uniqueCardValues = new Set(
@@ -421,18 +425,24 @@ export class AppGateway
       if (score.winners[1] === 1) {
         this.gameState.overallScore.nos++;
         this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-        if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
+          overallScore: this.gameState.overallScore,
+        });
+        if (
+            this.gameState.overallScore.eles == 12 ||
+            this.gameState.overallScore.nos == 12
+        ) {
+          this.resetGame();
         }
       } else if (score.winners[1] === 2) {
         this.gameState.overallScore.eles++;
         this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
+          overallScore: this.gameState.overallScore,
+        });
+        if (
+            this.gameState.overallScore.eles == 12 ||
+            this.gameState.overallScore.nos == 12
+        ) {
+          this.resetGame();
         }
       }
 
@@ -443,18 +453,24 @@ export class AppGateway
       if (score.winners[0] === 1) {
         this.gameState.overallScore.nos++;
         this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
+          overallScore: this.gameState.overallScore,
+        });
+        if (
+            this.gameState.overallScore.eles == 12 ||
+            this.gameState.overallScore.nos == 12
+        ) {
+          this.resetGame();
         }
       } else if (score.winners[0] === 2) {
         this.gameState.overallScore.eles++;
         this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
+          overallScore: this.gameState.overallScore,
+        });
+        if (
+            this.gameState.overallScore.eles == 12 ||
+            this.gameState.overallScore.nos == 12
+        ) {
+          this.resetGame();
         }
       }
       this.resetRound();
@@ -466,42 +482,53 @@ export class AppGateway
     let winningTeam;
 
     if (nosWins === 2) {
-        this.gameState.overallScore.nos++;
-        winningTeam = 'nos';
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
-      } else if (elesWins === 2) {
-        this.gameState.overallScore.eles++;
-        winningTeam = 'eles';
-        this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
-        }
+      this.gameState.overallScore.nos++;
+      winningTeam = 'nos';
+      this.server.emit('teste', {
+        overallScore: this.gameState.overallScore,
+      });
+      if (
+          this.gameState.overallScore.eles == 12 ||
+          this.gameState.overallScore.nos == 12
+      ) {
+        this.resetGame();
+      }
+    } else if (elesWins === 2) {
+      this.gameState.overallScore.eles++;
+      winningTeam = 'eles';
+      this.server.emit('teste', {
+        overallScore: this.gameState.overallScore,
+      });
+      if (
+          this.gameState.overallScore.eles == 12 ||
+          this.gameState.overallScore.nos == 12
+      ) {
+        this.resetGame();
+      }
     }
-
 
     if (score.rounds === 3 && score.winners[2] === 3) {
       if (score.winners[0] === 1) {
         this.gameState.overallScore.nos++;
         this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
+          overallScore: this.gameState.overallScore,
+        });
+        if (
+            this.gameState.overallScore.eles == 12 ||
+            this.gameState.overallScore.nos == 12
+        ) {
+          this.resetGame();
         }
       } else if (score.winners[0] === 2) {
         this.gameState.overallScore.eles++;
         this.server.emit('teste', {
-            overallScore: this.gameState.overallScore,
-          });
-          if(this.gameState.overallScore.eles == 12 || this.gameState.overallScore.nos == 12){
-            this.resetGame();
+          overallScore: this.gameState.overallScore,
+        });
+        if (
+            this.gameState.overallScore.eles == 12 ||
+            this.gameState.overallScore.nos == 12
+        ) {
+          this.resetGame();
         }
       }
       this.resetRound();
@@ -509,8 +536,6 @@ export class AppGateway
 
     this.logger.error('pqpq:', this.gameState.overallScore);
     if (winningTeam) {
-      this.logger.debug(`Jogo encerrado! Vencedor: ${winningTeam}`);
-
       this.server.emit('gameEnded', {
         winner: winningTeam,
         overallScore: this.gameState.overallScore,
@@ -527,8 +552,6 @@ export class AppGateway
 
   // Resetar a rodada
   resetRound(): void {
-    this.logger.debug('Resetando rodada...');
-
     // Resetar placar da rodada
     this.gameState.score.rounds = 0;
     this.gameState.score.winners = [0, 0, 0];
@@ -538,34 +561,7 @@ export class AppGateway
     this.gameState.shackles = [];
 
     // Resetar as mãos dos jogadores
-    this.gameState.players = this.gameState.players.map(player => ({
-      ...player,
-      hand: [],
-      originalHand: [],
-    }));
-
-    this.server.emit('roundReset');
-    this.server.emit('tableUpdated', []);
-    this.server.emit('playerHandsReset');
-
-    // Reembaralhar e redistribuir as cartas
-    this.shuffleDeck().then(() => this.distributeCards());
-  }
-
-
-  restartGame(): void {
-    this.logger.debug('Resetando rodada...');
-
-    // Resetar placar da rodada
-    this.gameState.score.rounds = 0;
-    this.gameState.score.winners = [0, 0, 0];
-
-    // Limpar a mesa e as manilhas
-    this.gameState.table = [];
-    this.gameState.shackles = [];
-
-    // Resetar as mãos dos jogadores
-    this.gameState.players = this.gameState.players.map(player => ({
+    this.gameState.players = this.gameState.players.map((player) => ({
       ...player,
       hand: [],
       originalHand: [],
@@ -586,6 +582,18 @@ export class AppGateway
 
   // Conexão com o cliente
   handleConnection(client: Socket) {
+    if (this.connectedPlayers.length >= 4) {
+      this.logger.warn(
+          `Cliente ${client.id} tentou se conectar, mas o limite foi atingido.`,
+      );
+      client.emit('connectionDenied', {
+        message:
+            'Número máximo de jogadores atingido. Tente novamente mais tarde.',
+      });
+      client.disconnect();
+      return;
+    }
+
     this.logger.log(`Cliente conectado: ${client.id}`);
     setTimeout(() => {
       client.emit('myPlayerId', newPlayerId);
@@ -596,8 +604,6 @@ export class AppGateway
     this.connectedPlayers.push({ socketId: client.id, playerId: newPlayerId });
     this.logger.log(`Jogador ${newPlayerId} conectado.`);
 
-
-
     // Quando atingir 4 jogadores, inicia a distribuição das cartas
     if (
         this.connectedPlayers.length === 4 &&
@@ -605,7 +611,6 @@ export class AppGateway
     ) {
       this.distributeCards();
     }
-
   }
 
   resetGame(): void {
@@ -649,20 +654,38 @@ export class AppGateway
       deckId: null,
     };
 
-    this.server.emit('gameReset', this.gameState);
+    this.isRequesting = false;
+
+    // Notifica os jogadores para atualizarem o estado
+    this.server.emit('gameReset');
   }
 
   // Desconexão do cliente
-  handleDisconnect(client: Socket) {
-    this.logger.log(`Cliente desconectado: ${client.id}`);
-
-    // Remove o jogador da lista de conectados
-    this.connectedPlayers = this.connectedPlayers.filter(
-        (player) => player.socketId !== client.id,
+  handleDisconnect(client: Socket): void {
+    const disconnected = this.connectedPlayers.find(
+        (p) => p.socketId === client.id,
     );
+    if (disconnected) {
+      this.logger.log(
+          `Cliente desconectado: ${client.id} (Jogador ${disconnected.playerId})`,
+      );
+      this.connectedPlayers = this.connectedPlayers.filter(
+          (p) => p.socketId !== client.id,
+      );
+      this.server.emit('playersUpdate', this.connectedPlayers);
+    }
 
-    this.logger.log(
-        `Jogador desconectado. Jogadores restantes: ${this.connectedPlayers.length}`,
-    );
+    // Se restaram menos de 4 jogadores, reseta o jogo
+    if (this.connectedPlayers.length < 4) {
+      this.logger.warn('Jogador desconectado. Reiniciando jogo...');
+
+      this.resetGame();
+
+      // Notificar os clientes restantes que o jogo foi resetado
+      this.server.emit('gameResetDueToDisconnect', {
+        message:
+            'Um jogador se desconectou. O jogo será reiniciado quando 4 jogadores estiverem conectados novamente.',
+      });
+    }
   }
 }

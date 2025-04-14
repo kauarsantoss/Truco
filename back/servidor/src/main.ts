@@ -1,8 +1,19 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+import { TrucoModule } from './truco.module';
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
-    const app = await NestFactory.create(AppModule);
-    await app.listen(process.env.PORT ?? 3333);
+    const app = await NestFactory.create(TrucoModule);
+    app.enableCors({
+        methods: 'GET,POST,PUT,DELETE',
+        allowedHeaders: 'Content-Type, Authorization',
+    });
+    app.useGlobalPipes(
+        new ValidationPipe({
+            transform: true,
+            whitelist: true,
+        }),
+    );
+    await app.listen(process.env.PORT ?? 3001);
 }
 bootstrap();
